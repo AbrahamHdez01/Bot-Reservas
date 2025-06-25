@@ -298,53 +298,30 @@ function App() {
                           value={selectedCategory ? { value: selectedCategory, label: selectedCategory } : null}
                           onChange={(option) => handleCategoryChange(option?.value)}
                           placeholder="Selecciona una categoría..."
-                          className="react-select-container"
-                          classNamePrefix="react-select"
+                          className="w-full"
+                          classNamePrefix="rs"
                         />
                       </div>
 
-                      {/* Products Selection */}
+                      {/* Products Multiselect */}
                       {selectedCategory && productsByCategory[selectedCategory] && (
                         <div className="form-group">
                           <label>Selecciona los productos de {selectedCategory} *</label>
-                          <div className="products-grid">
-                            {productsByCategory[selectedCategory].map((product) => (
-                              <div
-                                key={product}
-                                className={`product-item ${selectedProducts.includes(product) ? 'selected' : ''}`}
-                                onClick={() => handleProductToggle(product)}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedProducts.includes(product)}
-                                  onChange={() => handleProductToggle(product)}
-                                  className="product-checkbox"
-                                />
-                                <span className="product-name">{product}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Selected Products Summary */}
-                      {selectedProducts.length > 0 && (
-                        <div className="selected-products">
-                          <h4>Productos seleccionados ({selectedProducts.length}):</h4>
-                          <div className="selected-products-list">
-                            {selectedProducts.map((product, index) => (
-                              <span key={index} className="selected-product-tag">
-                                {product}
-                                <button
-                                  type="button"
-                                  onClick={() => handleProductToggle(product)}
-                                  className="remove-product"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
-                          </div>
+                          <Select
+                            isMulti
+                            options={productsByCategory[selectedCategory].map(product => ({
+                              value: product,
+                              label: product
+                            }))}
+                            value={selectedProducts.map(product => ({
+                              value: product,
+                              label: product
+                            }))}
+                            onChange={options => setSelectedProducts(options ? options.map(opt => opt.value) : [])}
+                            placeholder="Elige productos…"
+                            className="w-full"
+                            classNamePrefix="rs"
+                          />
                         </div>
                       )}
                     </div>
