@@ -10,7 +10,6 @@ Sistema completo de reservas para entregas en el Metro de la Ciudad de México c
 - 📱 **Multiplataforma**: Funciona en móviles y desktop
 - 🔒 **Seguridad**: Validación de horarios y protección de datos
 - 👨‍💼 **Panel de Administración**: Gestión completa de reservas con confirmación
-- ⏰ **Validaciones**: Mínimo 1 día de anticipación y 20 minutos entre entregas
 - 🚀 **Despliegue**: Optimizado para Render
 
 ## 🛠️ Tecnologías
@@ -319,4 +318,4 @@ MIT License - Libre para uso comercial y personal.
 
 ---
 
-**Desarrollado con ❤️ para el Metro CDMX** 
+**Desarrollado por Abraham Martinez Hernandez ** 
