@@ -152,6 +152,37 @@ if (googleCalendarConfigured) {
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+// Productos por categorías
+const PRODUCTS_BY_CATEGORY = {
+  'PERFUMES': [
+    'New Code Red', 'Devos Magnetic', 'Bleu Intense', 'Nitro Intense', 'Devos Sport',
+    'Magnat (Hombre)', 'L\'BEL i.d', 'Vanilla For Men', 'Forze Unlimited', 'Kromo Black Courant',
+    'Live Adventure', 'Homme 033', 'Atheus', 'Element D\'Orsay Inspire', 'New Code (clásico)',
+    'Nitro Cryzone', 'Desafiant', 'Le Tempo', 'Nitro Air Element', 'Live Intense',
+    'Fogos', 'Devos Magnetic Seduction', 'Leyenda Christian Meier', 'Fist (Cyzone)',
+    'Break In', 'Motion', 'D\'antan', 'H for Men Cardigan', 'Evolution', 'Energique',
+    'Extreme Intense', 'Score (Cyzone)', 'Fist Team', 'You', 'Seduttore', 'Victorius 1200 C',
+    'Kalos Prive Homme', 'Impredecible', 'Mityka Zaffyr', 'Chic MIA', 'Magnat (Mujer)',
+    'Dream Mer', 'Valentia', 'Exotic', 'Ainnara Bleu & Blue', 'Rêve Sensuelle',
+    'Tradition Du Thé Sensual', 'Tiare My Moment', 'Passion Concert Noir de Nuit',
+    'Autenti-X Liasson Temps', 'Femme L\'Bel', 'Flirty Girl', 'Momentos Libertad MoonMyse',
+    'Passion Musk', 'Sweet Black Exclusive', 'Grazzia Brises de Vie', 'Viva Vive Mon L\'Bel',
+    'Liberté In Me (Cyzone)', 'Soleil Rosé Sweet Black', 'Pure Bloom', 'Emouv Mithyka',
+    'Sweet Chick', 'L\'éclat L\'Bel', 'Danzzia', 'Liasson', 'Satin Rouge', 'Satin Nude',
+    'Dancing Sunset', 'Passion Body & Spirit'
+  ],
+  'BODY MIST': [
+    'Berrylicious', 'Taste Coco', 'Pink Pomelo', 'Select Mist', 'Taste Warm', 'Paradisso'
+  ],
+  'BOLSAS': [
+    'Bolso Bandolera Beige', 'Bolsa Café', 'Mochila Beige', 'Caja para Maquillaje'
+  ],
+  'COMPLEMENTOS': [
+    'Essential Limpiadora Suave', 'Essential Desmaquillador Bifásico', 'Espuma de Limpieza Facial',
+    'Elixir De Luxe (tratamiento capilar)', 'Tratamiento Multibeneficios para Cabello'
+  ]
+};
+
 // Route optimization using Google Maps API
 async function getTransitTime(origin, destination) {
   // Si no hay API key de Google Maps, devolver valores simulados
@@ -212,13 +243,30 @@ app.get('/api/stations', (req, res) => {
   });
 });
 
+// Get product categories
+app.get('/api/categories', (req, res) => {
+  res.json(Object.keys(PRODUCTS_BY_CATEGORY));
+});
+
+// Get products by category
+app.get('/api/products/:category', (req, res) => {
+  const { category } = req.params;
+  const products = PRODUCTS_BY_CATEGORY[category];
+  
+  if (!products) {
+    return res.status(404).json({ error: 'Categoría no encontrada' });
+  }
+  
+  res.json(products);
+});
+
 // Get available time slots for a date
 app.get('/api/available-slots/:date', (req, res) => {
   const { date } = req.params;
   
-  // Generate time slots from 9 AM to 8 PM
+  // Generate time slots from 10 AM to 6 PM (18:00)
   const slots = [];
-  for (let hour = 9; hour <= 20; hour++) {
+  for (let hour = 10; hour <= 17; hour++) { // Cambiar a <= 17 para incluir hasta 17:30
     for (let minute = 0; minute < 60; minute += 30) {
       const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       slots.push(time);

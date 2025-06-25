@@ -847,4 +847,121 @@ select:focus {
   .confirm-btn {
     width: 100%;
   }
+}
+
+/* Product Selection Styles */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 15px;
+  background-color: #f8f9fa;
+}
+
+.product-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.product-item:hover {
+  background-color: #f0f2f5;
+  border-color: #007bff;
+}
+
+.product-item.selected {
+  background-color: #e3f2fd;
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.product-checkbox {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.product-name {
+  font-size: 14px;
+  flex: 1;
+}
+
+.selected-products {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e1e5e9;
+}
+
+.selected-products h4 {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 14px;
+}
+
+.selected-products-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-product-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.remove-product {
+  background: none;
+  border: none;
+  color: white;
+  margin-left: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.remove-product:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+    max-height: 250px;
+  }
+  
+  .product-item {
+    padding: 10px;
+  }
+  
+  .selected-products-list {
+    flex-direction: column;
+  }
+  
+  .selected-product-tag {
+    width: fit-content;
+  }
 } 
