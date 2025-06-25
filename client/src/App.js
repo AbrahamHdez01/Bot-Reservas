@@ -157,6 +157,9 @@ function App() {
                   <h1>Metro CDMX Delivery</h1>
                 </div>
                 <p className="subtitle">Reserva tus entregas en el Metro de la Ciudad de México</p>
+                <div className="admin-link">
+                  <a href="/admin" className="admin-link-text">👨‍💼 Admin</a>
+                </div>
               </div>
             </header>
 

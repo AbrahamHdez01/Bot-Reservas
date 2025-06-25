@@ -482,6 +482,10 @@ app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
 });
 
 // Serve React app
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
