@@ -28,7 +28,7 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [productsByCategory, setProductsByCategory] = useState({});
-  const [selectedProducts, setSelectedProducts] = useState({});
+  const [cart, setCart] = useState({});
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: ''
@@ -123,7 +123,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!selectedDate || !selectedSlot || !selectedStation || Object.values(selectedProducts).flat().length === 0) {
+    if (!selectedDate || !selectedSlot || !selectedStation || Object.keys(cart).length === 0) {
       toast.error('Por favor completa todos los campos');
       return;
     }
@@ -139,7 +139,7 @@ function App() {
         body: JSON.stringify({
           customer_name: formData.customer_name,
           customer_phone: formData.customer_phone,
-          products: Object.values(selectedProducts).flat().join(', '),
+          products: Object.values(cart).map(item => `${item.nombre} x${item.cantidad} (${item.categoria})`).join(', '),
           metro_station: selectedStation.name,
           delivery_date: selectedDate.toISOString().split('T')[0],
           delivery_time: selectedSlot
@@ -155,7 +155,7 @@ function App() {
         setSelectedDate(null);
         setSelectedSlot(null);
         setSelectedStation(null);
-        setSelectedProducts({});
+        setCart({});
         setSelectedCategory('');
         setFormData({
           customer_name: '',
@@ -219,15 +219,28 @@ function App() {
   };
 
   // Handle product selection
-  const handleProductsChange = (category, options) => {
-    setSelectedProducts(prev => ({
-      ...prev,
-      [category]: options ? options.map(opt => opt.value) : []
-    }));
+  const handleAddProduct = (category, product) => {
+    setCart(prev => {
+      const key = `${category}||${product}`;
+      if (prev[key]) {
+        // Si ya está, aumentar cantidad
+        return { ...prev, [key]: { ...prev[key], cantidad: prev[key].cantidad + 1 } };
+      } else {
+        // Si no está, agregar con cantidad 1
+        return { ...prev, [key]: { cantidad: 1, categoria: category, nombre: product } };
+      }
+    });
   };
 
-  // Obtener todos los productos seleccionados de todas las categorías
-  const allSelectedProducts = Object.values(selectedProducts).flat();
+  // Para cambiar cantidad
+  const handleChangeCantidad = (key, cantidad) => {
+    setCart(prev => ({ ...prev, [key]: { ...prev[key], cantidad: Math.max(1, cantidad) } }));
+  };
+
+  // Para eliminar producto del carrito
+  const handleRemoveProduct = (key) => {
+    setCart(prev => { const copy = { ...prev }; delete copy[key]; return copy; });
+  };
 
   return (
     <Router>
@@ -312,11 +325,13 @@ function App() {
                               value: product,
                               label: product
                             }))}
-                            value={(selectedProducts[selectedCategory] || []).map(product => ({
-                              value: product,
-                              label: product
-                            }))}
-                            onChange={options => handleProductsChange(selectedCategory, options)}
+                            value={[]}
+                            onChange={options => {
+                              if (options && options.length > 0) {
+                                const last = options[options.length - 1];
+                                handleAddProduct(selectedCategory, last.value);
+                              }
+                            }}
                             placeholder="Elige productos…"
                             className="w-full"
                             classNamePrefix="rs"
@@ -389,18 +404,28 @@ function App() {
                 </div>
 
                 {/* Product Summary */}
-                {allSelectedProducts.length > 0 && (
-                  <div className="selected-products">
-                    <h4>Productos seleccionados ({allSelectedProducts.length}):</h4>
-                    <div className="selected-products-list">
-                      {allSelectedProducts.map((product, index) => (
-                        <span key={index} className="selected-product-tag">
-                          {product}
-                        </span>
+                <div className="cart-section">
+                  <h4>Carrito de productos</h4>
+                  {Object.keys(cart).length === 0 ? (
+                    <p>No hay productos en el carrito.</p>
+                  ) : (
+                    <ul className="cart-list">
+                      {Object.entries(cart).map(([key, item]) => (
+                        <li key={key} className="cart-item">
+                          <span className="cart-product-name">{item.nombre} <span className="cart-product-cat">({item.categoria})</span></span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.cantidad}
+                            onChange={e => handleChangeCantidad(key, parseInt(e.target.value) || 1)}
+                            className="cart-qty-input"
+                          />
+                          <button onClick={() => handleRemoveProduct(key)} className="cart-remove-btn">Eliminar</button>
+                        </li>
                       ))}
-                    </div>
-                  </div>
-                )}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
           </div>
