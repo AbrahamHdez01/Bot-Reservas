@@ -66,7 +66,22 @@ function App() {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       const response = await axios.get(`/api/available-slots/${dateStr}`);
-      setAvailableSlots(response.data);
+      
+      // Filtrar horarios que ya pasaron si es hoy
+      const now = new Date();
+      const isToday = selectedDate.toDateString() === now.toDateString();
+      
+      let slots = response.data;
+      if (isToday) {
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        slots = slots.filter(slot => {
+          const [hour, minute] = slot.split(':').map(Number);
+          return hour > currentHour || (hour === currentHour && minute > currentMinute);
+        });
+      }
+      
+      setAvailableSlots(slots);
     } catch (error) {
       toast.error('Error al cargar horarios disponibles');
     }
@@ -222,7 +237,13 @@ function App() {
                           <DatePicker
                             selected={selectedDate}
                             onChange={setSelectedDate}
-                            minDate={new Date(Date.now() + 24 * 60 * 60 * 1000)} // Tomorrow
+                            minDate={new Date(Date.now() + 24 * 60 * 60 * 1000)} // Mañana
+                            filterDate={(date) => {
+                              // Solo permitir fechas futuras (no hoy)
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              return date > today;
+                            }}
                             dateFormat="dd/MM/yyyy"
                             placeholderText="Selecciona una fecha"
                             className="date-picker"

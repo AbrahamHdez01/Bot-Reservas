@@ -12,6 +12,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy for Render deployment
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors());
@@ -137,8 +140,14 @@ if (googleCalendarConfigured) {
     refresh_token: process.env.GOOGLE_REFRESH_TOKEN
   });
   console.log('✅ Google Calendar configurado correctamente');
+  console.log('📅 Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Configurado' : 'Faltante');
+  console.log('🔑 Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Configurado' : 'Faltante');
+  console.log('🔄 Refresh Token:', process.env.GOOGLE_REFRESH_TOKEN ? 'Configurado' : 'Faltante');
 } else {
   console.log('⚠️ Google Calendar no configurado - las reservas se guardarán solo en la base de datos');
+  console.log('📅 Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Configurado' : 'Faltante');
+  console.log('🔑 Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Configurado' : 'Faltante');
+  console.log('🔄 Refresh Token:', process.env.GOOGLE_REFRESH_TOKEN ? 'Configurado' : 'Faltante');
 }
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
@@ -245,10 +254,18 @@ app.post('/api/bookings', async (req, res) => {
     // Validate minimum 1 day advance booking
     const deliveryDateTime = moment(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm');
     const tomorrow = moment().add(1, 'day').startOf('day');
+    const now = moment();
     
     if (deliveryDateTime.isBefore(tomorrow)) {
       return res.status(400).json({
         error: 'Solo se pueden hacer reservas con al menos 1 día de anticipación.'
+      });
+    }
+
+    // Validate that the time is in the future (not today or past)
+    if (deliveryDateTime.isBefore(now)) {
+      return res.status(400).json({
+        error: 'No se pueden hacer reservas en horas que ya pasaron.'
       });
     }
 
@@ -288,6 +305,7 @@ app.post('/api/bookings', async (req, res) => {
     // Create Google Calendar event
     if (googleCalendarConfigured) {
       try {
+        console.log('📅 Intentando crear evento en Google Calendar...');
         const event = {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
@@ -313,6 +331,8 @@ app.post('/api/bookings', async (req, res) => {
           resource: event,
         });
 
+        console.log('✅ Evento creado en Google Calendar:', calendarResponse.data.id);
+
         // Update booking with Google Calendar event ID
         db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
           [calendarResponse.data.id, result]);
@@ -325,7 +345,8 @@ app.post('/api/bookings', async (req, res) => {
         });
 
       } catch (calendarError) {
-        console.error('Error creating calendar event:', calendarError);
+        console.error('❌ Error creating calendar event:', calendarError.message);
+        console.error('📋 Error details:', calendarError.response?.data || calendarError);
         res.json({
           success: true,
           booking_id: result,
@@ -334,6 +355,7 @@ app.post('/api/bookings', async (req, res) => {
       }
     } else {
       // Si Google Calendar no está configurado, solo guardar en base de datos
+      console.log('⚠️ Google Calendar no configurado, guardando solo en base de datos');
       res.json({
         success: true,
         booking_id: result,
