@@ -21,6 +21,7 @@ function AdminPanel() {
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -184,6 +185,12 @@ function AdminPanel() {
             </div>
           </div>
 
+          <div className="admin-filters">
+            <button className={`filter-btn${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>Todas</button>
+            <button className={`filter-btn${filter === 'pending' ? ' active' : ''}`} onClick={() => setFilter('pending')}>Pendientes</button>
+            <button className={`filter-btn${filter === 'confirmed' ? ' active' : ''}`} onClick={() => setFilter('confirmed')}>Confirmadas</button>
+          </div>
+
           <div className="bookings-admin-section">
             <h2>Gestión de Reservas</h2>
             <div className="bookings-admin-list">
@@ -193,7 +200,7 @@ function AdminPanel() {
                   <p>No hay reservas registradas</p>
                 </div>
               ) : (
-                bookings.map((booking) => (
+                bookings.filter(b => filter === 'all' ? true : b.status === filter).map((booking) => (
                   <div key={booking.id} className={`booking-admin-card ${booking.status}`}>
                     <div className="booking-admin-header">
                       <div className="booking-status">

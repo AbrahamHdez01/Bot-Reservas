@@ -317,26 +317,51 @@ function App() {
 
                       {/* Products Multiselect */}
                       {selectedCategory && productsByCategory[selectedCategory] && (
-                        <div className="form-group">
-                          <label>Selecciona los productos de {selectedCategory} *</label>
-                          <Select
-                            isMulti
-                            options={productsByCategory[selectedCategory].map(product => ({
-                              value: product,
-                              label: product
-                            }))}
-                            value={[]}
-                            onChange={options => {
-                              if (options && options.length > 0) {
-                                const last = options[options.length - 1];
-                                handleAddProduct(selectedCategory, last.value);
-                              }
-                            }}
-                            placeholder="Elige productos…"
-                            className="w-full"
-                            classNamePrefix="rs"
-                          />
-                        </div>
+                        <>
+                          <div className="form-group">
+                            <label>Selecciona los productos de {selectedCategory} *</label>
+                            <Select
+                              isMulti
+                              options={productsByCategory[selectedCategory].map(product => ({
+                                value: product,
+                                label: product
+                              }))}
+                              value={[]}
+                              onChange={options => {
+                                if (options && options.length > 0) {
+                                  const last = options[options.length - 1];
+                                  handleAddProduct(selectedCategory, last.value);
+                                }
+                              }}
+                              placeholder="Elige productos…"
+                              className="w-full"
+                              classNamePrefix="rs"
+                            />
+                          </div>
+                          {/* Carrito debajo del selector */}
+                          <div className="cart-section">
+                            <h4>Carrito de productos</h4>
+                            {Object.keys(cart).length === 0 ? (
+                              <p>No hay productos en el carrito.</p>
+                            ) : (
+                              <ul className="cart-list">
+                                {Object.entries(cart).map(([key, item]) => (
+                                  <li key={key} className="cart-item">
+                                    <span className="cart-product-name">{item.nombre} <span className="cart-product-cat">({item.categoria})</span></span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={item.cantidad}
+                                      onChange={e => handleChangeCantidad(key, parseInt(e.target.value) || 1)}
+                                      className="cart-qty-input"
+                                    />
+                                    <button onClick={() => handleRemoveProduct(key)} className="cart-remove-btn">Eliminar</button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -401,30 +426,6 @@ function App() {
                       {isSubmitting ? 'Creando reserva...' : 'Crear Reserva'}
                     </button>
                   </form>
-                </div>
-
-                {/* Product Summary */}
-                <div className="cart-section">
-                  <h4>Carrito de productos</h4>
-                  {Object.keys(cart).length === 0 ? (
-                    <p>No hay productos en el carrito.</p>
-                  ) : (
-                    <ul className="cart-list">
-                      {Object.entries(cart).map(([key, item]) => (
-                        <li key={key} className="cart-item">
-                          <span className="cart-product-name">{item.nombre} <span className="cart-product-cat">({item.categoria})</span></span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.cantidad}
-                            onChange={e => handleChangeCantidad(key, parseInt(e.target.value) || 1)}
-                            className="cart-qty-input"
-                          />
-                          <button onClick={() => handleRemoveProduct(key)} className="cart-remove-btn">Eliminar</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
               </div>
             </div>
