@@ -55,6 +55,9 @@ function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Crear índice único para evitar duplicados al sincronizar con Google Calendar
+    db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_calendar_event_id ON bookings(google_calendar_event_id)`);
+
     // Metro stations table
     db.run(`CREATE TABLE IF NOT EXISTS metro_stations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,6 +188,109 @@ const PRODUCTS_BY_CATEGORY = {
     'Elixir De Luxe (tratamiento capilar)', 'Tratamiento Multibeneficios para Cabello'
   ]
 };
+
+// === Sincronización con Google Calendar para reconstruir el histórico de reservas ===
+async function syncBookingsFromCalendar() {
+  if (!googleCalendarConfigured) return;
+
+  try {
+    console.log('🔄 Sincronizando reservas desde Google Calendar…');
+
+    // Consultar eventos de los últimos 12 meses y los próximos 12 meses
+    const timeMin = moment().subtract(12, 'months').startOf('day').toISOString();
+    const timeMax = moment().add(12, 'months').endOf('day').toISOString();
+
+    const eventsRes = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 2500,
+    });
+
+    const events = eventsRes.data.items || [];
+
+    const insertBookingStmt = db.prepare(`INSERT OR IGNORE INTO bookings
+      (customer_name, customer_phone, products, metro_station, delivery_date, delivery_time, status, google_calendar_event_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+
+    for (const ev of events) {
+      // Solo procesar eventos creados por la app (contienen "Entrega:" en el summary)
+      if (!ev.summary || !ev.summary.includes('Entrega:')) continue;
+
+      // Determinar estado
+      let status = 'pending';
+      if (ev.summary.includes('[CONFIRMADA]') || ev.summary.includes('[CONFIRMADO]') || ev.summary.includes('[CONFIRMADA]')) {
+        status = 'confirmed';
+      }
+
+      // Extraer productos y estación del summary => "Entrega: <products> - <station>"
+      let products = '';
+      let metro_station = '';
+      const summaryMatch = ev.summary.match(/Entrega:\s*(.+?)\s*-\s*(.+)$/);
+      if (summaryMatch) {
+        products = summaryMatch[1].trim();
+        metro_station = summaryMatch[2].trim();
+      }
+
+      // Parsear del description los campos faltantes
+      let customer_name = '';
+      let customer_phone = '';
+      if (ev.description) {
+        const nameMatch = ev.description.match(/Cliente:\s*(.+)/i);
+        if (nameMatch) customer_name = nameMatch[1].trim();
+        const phoneMatch = ev.description.match(/Tel[eé]fono:\s*(.+)/i);
+        if (phoneMatch) customer_phone = phoneMatch[1].trim();
+        // Si description contiene Productos/Estación puede sobreescribir
+        const prodMatch = ev.description.match(/Productos:\s*(.+)/i);
+        if (prodMatch) products = prodMatch[1].trim();
+        const stationMatch = ev.description.match(/Estación:\s*(.+)/i);
+        if (stationMatch) metro_station = stationMatch[1].trim();
+        const statusMatch = ev.description.match(/Estado:\s*(.+)/i);
+        if (statusMatch) {
+          status = statusMatch[1].toLowerCase().includes('confirm') ? 'confirmed' : 'pending';
+        }
+      }
+
+      // Fecha y hora de entrega
+      let delivery_date = '';
+      let delivery_time = '';
+      if (ev.start?.dateTime) {
+        const dt = moment(ev.start.dateTime).tz('America/Mexico_City');
+        delivery_date = dt.format('YYYY-MM-DD');
+        delivery_time = dt.format('HH:mm');
+      }
+
+      if (!delivery_date || !delivery_time) continue; // datos insuficientes
+
+      insertBookingStmt.run(
+        customer_name,
+        customer_phone,
+        products,
+        metro_station,
+        delivery_date,
+        delivery_time,
+        status,
+        ev.id
+      );
+    }
+
+    insertBookingStmt.finalize(() => {
+      console.log('✅ Sincronización de reservas finalizada');
+    });
+  } catch (err) {
+    console.error('❌ Error al sincronizar reservas desde Google Calendar:', err);
+  }
+}
+
+// Llamar a la sincronización después de inicializar la base de datos
+if (googleCalendarConfigured) {
+  // Asegurarnos de esperar a que la tabla "bookings" exista (ya creada en initDatabase)
+  db.serialize(() => {
+    syncBookingsFromCalendar();
+  });
+}
 
 // Route optimization using Google Maps API
 async function getTransitTime(origin, destination) {
@@ -360,11 +466,11 @@ app.post('/api/bookings', async (req, res) => {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
           start: {
-            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format(),
+            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format('YYYY-MM-DDTHH:mm:ss'),
             timeZone: 'America/Mexico_City',
           },
           end: {
-            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format(),
+            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format('YYYY-MM-DDTHH:mm:ss'),
             timeZone: 'America/Mexico_City',
           },
           reminders: {
@@ -492,11 +598,11 @@ app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
           summary: `[CONFIRMADA] Entrega: ${booking.products} - ${booking.metro_station}`,
           description: `Cliente: ${booking.customer_name}\nTeléfono: ${booking.customer_phone}\nProductos: ${booking.products}\nEstación: ${booking.metro_station}\nEstado: Confirmada`,
           start: {
-            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format(),
+            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format('YYYY-MM-DDTHH:mm:ss'),
             timeZone: 'America/Mexico_City',
           },
           end: {
-            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format(),
+            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format('YYYY-MM-DDTHH:mm:ss'),
             timeZone: 'America/Mexico_City',
           },
           reminders: {
