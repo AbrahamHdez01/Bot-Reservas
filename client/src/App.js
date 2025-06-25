@@ -28,7 +28,7 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [productsByCategory, setProductsByCategory] = useState({});
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState({});
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: ''
@@ -123,7 +123,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!selectedDate || !selectedSlot || !selectedStation || selectedProducts.length === 0) {
+    if (!selectedDate || !selectedSlot || !selectedStation || Object.values(selectedProducts).flat().length === 0) {
       toast.error('Por favor completa todos los campos');
       return;
     }
@@ -139,7 +139,7 @@ function App() {
         body: JSON.stringify({
           customer_name: formData.customer_name,
           customer_phone: formData.customer_phone,
-          products: selectedProducts.join(', '), // Convertir array a string
+          products: Object.values(selectedProducts).flat().join(', '),
           metro_station: selectedStation.name,
           delivery_date: selectedDate.toISOString().split('T')[0],
           delivery_time: selectedSlot
@@ -155,7 +155,7 @@ function App() {
         setSelectedDate(null);
         setSelectedSlot(null);
         setSelectedStation(null);
-        setSelectedProducts([]);
+        setSelectedProducts({});
         setSelectedCategory('');
         setFormData({
           customer_name: '',
@@ -213,22 +213,22 @@ function App() {
   // Handle category selection
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
-    setSelectedProducts([]);
+    setSelectedProducts({});
     if (!productsByCategory[category]) {
       fetchProductsByCategory(category);
     }
   };
 
   // Handle product selection
-  const handleProductToggle = (product) => {
-    setSelectedProducts(prev => {
-      if (prev.includes(product)) {
-        return prev.filter(p => p !== product);
-      } else {
-        return [...prev, product];
-      }
-    });
+  const handleProductsChange = (category, options) => {
+    setSelectedProducts(prev => ({
+      ...prev,
+      [category]: options ? options.map(opt => opt.value) : []
+    }));
   };
+
+  // Obtener todos los productos seleccionados de todas las categorías
+  const allSelectedProducts = Object.values(selectedProducts).flat();
 
   return (
     <Router>
@@ -313,11 +313,11 @@ function App() {
                               value: product,
                               label: product
                             }))}
-                            value={selectedProducts.map(product => ({
+                            value={(selectedProducts[selectedCategory] || []).map(product => ({
                               value: product,
                               label: product
                             }))}
-                            onChange={options => setSelectedProducts(options ? options.map(opt => opt.value) : [])}
+                            onChange={options => handleProductsChange(selectedCategory, options)}
                             placeholder="Elige productos…"
                             className="w-full"
                             classNamePrefix="rs"
@@ -352,9 +352,8 @@ function App() {
                           <DatePicker
                             selected={selectedDate}
                             onChange={setSelectedDate}
-                            minDate={new Date(Date.now() + 24 * 60 * 60 * 1000)} // Mañana
+                            minDate={new Date()}
                             filterDate={(date) => {
-                              // Solo permitir fechas futuras (no hoy)
                               const today = new Date();
                               today.setHours(0, 0, 0, 0);
                               return date > today;
@@ -389,6 +388,20 @@ function App() {
                     </button>
                   </form>
                 </div>
+
+                {/* Product Summary */}
+                {allSelectedProducts.length > 0 && (
+                  <div className="selected-products">
+                    <h4>Productos seleccionados ({allSelectedProducts.length}):</h4>
+                    <div className="selected-products-list">
+                      {allSelectedProducts.map((product, index) => (
+                        <span key={index} className="selected-product-tag">
+                          {product}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

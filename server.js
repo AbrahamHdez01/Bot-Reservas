@@ -152,24 +152,27 @@ if (googleCalendarConfigured) {
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-// Productos por categorías
+// Productos por categorías y género
 const PRODUCTS_BY_CATEGORY = {
-  'PERFUMES': [
+  'PERFUMES HOMBRE': [
     'New Code Red', 'Devos Magnetic', 'Bleu Intense', 'Nitro Intense', 'Devos Sport',
-    'Magnat (Hombre)', 'L\'BEL i.d', 'Vanilla For Men', 'Forze Unlimited', 'Kromo Black Courant',
-    'Live Adventure', 'Homme 033', 'Atheus', 'Element D\'Orsay Inspire', 'New Code (clásico)',
+    'Magnat (ed. caballero)', 'L\'Bel i.d', 'Vanilla For Men', 'Forze Unlimited', 'Kromo Black Courant',
+    'Live Adventure', 'Homme 033', 'Atheus', 'Element D\'Orsay Inspire', 'New Code (ed. caballero)',
     'Nitro Cryzone', 'Desafiant', 'Le Tempo', 'Nitro Air Element', 'Live Intense',
-    'Fogos', 'Devos Magnetic Seduction', 'Leyenda Christian Meier', 'Fist (Cyzone)',
-    'Break In', 'Motion', 'D\'antan', 'H for Men Cardigan', 'Evolution', 'Energique',
-    'Extreme Intense', 'Score (Cyzone)', 'Fist Team', 'You', 'Seduttore', 'Victorius 1200 C',
-    'Kalos Prive Homme', 'Impredecible', 'Mityka Zaffyr', 'Chic MIA', 'Magnat (Mujer)',
-    'Dream Mer', 'Valentia', 'Exotic', 'Ainnara Bleu & Blue', 'Rêve Sensuelle',
-    'Tradition Du Thé Sensual', 'Tiare My Moment', 'Passion Concert Noir de Nuit',
-    'Autenti-X Liasson Temps', 'Femme L\'Bel', 'Flirty Girl', 'Momentos Libertad MoonMyse',
-    'Passion Musk', 'Sweet Black Exclusive', 'Grazzia Brises de Vie', 'Viva Vive Mon L\'Bel',
-    'Liberté In Me (Cyzone)', 'Soleil Rosé Sweet Black', 'Pure Bloom', 'Emouv Mithyka',
-    'Sweet Chick', 'L\'éclat L\'Bel', 'Danzzia', 'Liasson', 'Satin Rouge', 'Satin Nude',
-    'Dancing Sunset', 'Passion Body & Spirit'
+    'Fogos', 'Devos Magnetic Seduction', 'Leyenda Christian Meier', 'Fist Cyzone',
+    'Break In', 'Motion', 'D\'Antan', 'H for Men Cardigan Evolution (set)',
+    'Energique Extreme Intense (trío)', 'Score Cyzone', 'Fist Team', 'You (ed. hombre)',
+    'Seduttore', 'Victorius 1200 C', 'Kalos Privé Homme', 'Impredecible'
+  ],
+  'PERFUMES MUJER': [
+    'Mityka Zaffyr', 'Chic Mia', 'Magnat (ed. dama)', 'Dream Mer', 'Valentia',
+    'Exotic', 'Ainnara Bleu & Blue', 'Rêve Sensuelle', 'Tradition Du Thé Sensual',
+    'Tiaré My Moment', 'Passion Concert Noir de Nuit', 'Autenti-X', 'Liasson Temps',
+    'Femme L\'Bel', 'Flirty Girl', 'Momentos Libertad', 'Moon Myse', 'Passion Musk',
+    'Sweet Black Exclusive', 'Grazzia', 'Brises de Vie', 'Viva ViveMon L\'Bel',
+    'Liberté', 'In Me Cyzone', 'Soleil Rosé', 'Pure Bloom', 'Emouv Mithyka',
+    'Sweet Chick', 'L\'Éclat L\'Bel', 'Danzzia', 'Liasson (ed. dama)',
+    'Satin Rouge', 'Satin Nude', 'Dancing Sunset', 'Passion Body & Spirit'
   ],
   'BODY MIST': [
     'Berrylicious', 'Taste Coco', 'Pink Pomelo', 'Select Mist', 'Taste Warm', 'Paradisso'
@@ -299,18 +302,17 @@ app.post('/api/bookings', async (req, res) => {
   } = req.body;
 
   try {
-    // Validate minimum 1 day advance booking
+    // Validate that the time is not today and not in the past
     const deliveryDateTime = moment(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm');
-    const tomorrow = moment().add(1, 'day').startOf('day');
     const now = moment();
-    
-    if (deliveryDateTime.isBefore(tomorrow)) {
+    const today = moment().format('YYYY-MM-DD');
+
+    if (delivery_date === today) {
       return res.status(400).json({
-        error: 'Solo se pueden hacer reservas con al menos 1 día de anticipación.'
+        error: 'No se puede reservar para el mismo día.'
       });
     }
 
-    // Validate that the time is in the future (not today or past)
     if (deliveryDateTime.isBefore(now)) {
       return res.status(400).json({
         error: 'No se pueden hacer reservas en horas que ya pasaron.'
