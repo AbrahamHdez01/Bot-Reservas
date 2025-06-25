@@ -6,7 +6,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { google } = require('googleapis');
 const axios = require('axios');
-const moment = require('moment');
+const moment = require('moment-timezone');
 require('dotenv').config();
 
 const app = express();
@@ -303,17 +303,17 @@ app.post('/api/bookings', async (req, res) => {
 
   try {
     // Validate that the time is not today and not in the past
-    const deliveryDateTime = moment(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm');
-    const now = moment();
-    const today = moment().format('YYYY-MM-DD');
+    const deliveryDateTime = moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    const nowCDMX = moment.tz('America/Mexico_City');
+    const todayCDMX = nowCDMX.format('YYYY-MM-DD');
 
-    if (delivery_date === today) {
+    if (delivery_date === todayCDMX) {
       return res.status(400).json({
         error: 'No se puede reservar para el mismo día.'
       });
     }
 
-    if (deliveryDateTime.isBefore(now)) {
+    if (deliveryDateTime.isBefore(nowCDMX)) {
       return res.status(400).json({
         error: 'No se pueden hacer reservas en horas que ya pasaron.'
       });
@@ -327,10 +327,10 @@ app.post('/api/bookings', async (req, res) => {
       });
     });
 
-    const requestedTime = moment(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm');
+    const requestedTime = moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
     
     for (const booking of existingBookings) {
-      const bookingTime = moment(`${delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm');
+      const bookingTime = moment.tz(`${delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
       const timeDiff = Math.abs(requestedTime.diff(bookingTime, 'minutes'));
       
       if (timeDiff < 20) {
@@ -360,11 +360,11 @@ app.post('/api/bookings', async (req, res) => {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
           start: {
-            dateTime: moment(`${delivery_date} ${delivery_time}`).format(),
+            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format(),
             timeZone: 'America/Mexico_City',
           },
           end: {
-            dateTime: moment(`${delivery_date} ${delivery_time}`).add(30, 'minutes').format(),
+            dateTime: moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format(),
             timeZone: 'America/Mexico_City',
           },
           reminders: {
@@ -492,11 +492,11 @@ app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
           summary: `[CONFIRMADA] Entrega: ${booking.products} - ${booking.metro_station}`,
           description: `Cliente: ${booking.customer_name}\nTeléfono: ${booking.customer_phone}\nProductos: ${booking.products}\nEstación: ${booking.metro_station}\nEstado: Confirmada`,
           start: {
-            dateTime: moment(`${booking.delivery_date} ${booking.delivery_time}`).format(),
+            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').format(),
             timeZone: 'America/Mexico_City',
           },
           end: {
-            dateTime: moment(`${booking.delivery_date} ${booking.delivery_time}`).add(30, 'minutes').format(),
+            dateTime: moment.tz(`${booking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City').add(30, 'minutes').format(),
             timeZone: 'America/Mexico_City',
           },
           reminders: {
@@ -528,6 +528,51 @@ app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
   } catch (error) {
     console.error('Error confirming booking:', error);
     res.status(500).json({ error: 'Error al confirmar la reserva' });
+  }
+});
+
+// Cancel a booking
+app.delete('/api/bookings/:id', adminAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Get booking details
+    const booking = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM bookings WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    // Delete Google Calendar event if it exists
+    if (booking.google_calendar_event_id && googleCalendarConfigured) {
+      try {
+        await calendar.events.delete({
+          calendarId: 'primary',
+          eventId: booking.google_calendar_event_id,
+        });
+      } catch (calendarError) {
+        console.error('Error deleting calendar event:', calendarError);
+        // Continuar aunque falle la eliminación en Google Calendar
+      }
+    }
+
+    // Delete booking from database
+    await new Promise((resolve, reject) => {
+      db.run('DELETE FROM bookings WHERE id = ?', [id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    res.json({ success: true, message: 'Reserva cancelada y eliminada correctamente' });
+  } catch (error) {
+    console.error('Error cancelling booking:', error);
+    res.status(500).json({ error: 'Error al cancelar la reserva' });
   }
 });
 
