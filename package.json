@@ -8,22 +8,29 @@
     "dev": "nodemon server.js",
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
-    "heroku-postbuild": "npm run install-client && npm run build"
+    "heroku-postbuild": "npm run install-client && npm run build",
+    "migrate": "node migrate-database.js"
   },
-  "keywords": ["metro", "cdmx", "delivery", "booking", "routes"],
+  "keywords": [
+    "metro",
+    "cdmx",
+    "delivery",
+    "booking",
+    "routes"
+  ],
   "author": "Tu Nombre",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "sqlite3": "^5.1.6",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.1.5",
     "googleapis": "^128.0.0",
-    "axios": "^1.6.0",
+    "helmet": "^7.1.0",
     "moment": "^2.29.4",
     "node-cron": "^3.0.3",
-    "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5"
+    "sqlite3": "^5.1.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -31,4 +38,4 @@
   "engines": {
     "node": ">=18.0.0"
   }
-} 
+}

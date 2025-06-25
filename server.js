@@ -42,12 +42,12 @@ function initDatabase() {
     db.run(`CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_name TEXT NOT NULL,
-      customer_email TEXT NOT NULL,
       customer_phone TEXT NOT NULL,
       products TEXT NOT NULL,
       metro_station TEXT NOT NULL,
       delivery_date TEXT NOT NULL,
       delivery_time TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
       google_calendar_event_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -209,7 +209,6 @@ app.get('/api/available-slots/:date', (req, res) => {
 app.post('/api/bookings', async (req, res) => {
   const {
     customer_name,
-    customer_email,
     customer_phone,
     products,
     metro_station,
@@ -218,6 +217,16 @@ app.post('/api/bookings', async (req, res) => {
   } = req.body;
 
   try {
+    // Validate minimum 1 day advance booking
+    const deliveryDateTime = moment(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm');
+    const tomorrow = moment().add(1, 'day').startOf('day');
+    
+    if (deliveryDateTime.isBefore(tomorrow)) {
+      return res.status(400).json({
+        error: 'Solo se pueden hacer reservas con al menos 1 día de anticipación.'
+      });
+    }
+
     // Validate minimum time between bookings (20 minutes)
     const existingBookings = await new Promise((resolve, reject) => {
       db.all('SELECT delivery_time FROM bookings WHERE delivery_date = ?', [delivery_date], (err, rows) => {
@@ -242,8 +251,8 @@ app.post('/api/bookings', async (req, res) => {
     // Insert booking into database
     const result = await new Promise((resolve, reject) => {
       db.run(
-        'INSERT INTO bookings (customer_name, customer_email, customer_phone, products, metro_station, delivery_date, delivery_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [customer_name, customer_email, customer_phone, products, metro_station, delivery_date, delivery_time],
+        'INSERT INTO bookings (customer_name, customer_phone, products, metro_station, delivery_date, delivery_time, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [customer_name, customer_phone, products, metro_station, delivery_date, delivery_time, 'pending'],
         function(err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -254,8 +263,8 @@ app.post('/api/bookings', async (req, res) => {
     // Create Google Calendar event
     try {
       const event = {
-        summary: `Entrega: ${products} - ${metro_station}`,
-        description: `Cliente: ${customer_name}\nEmail: ${customer_email}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}`,
+        summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
+        description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
         start: {
           dateTime: moment(`${delivery_date} ${delivery_time}`).format(),
           timeZone: 'America/Mexico_City',
@@ -304,8 +313,17 @@ app.post('/api/bookings', async (req, res) => {
   }
 });
 
+function adminAuth(req, res, next) {
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123456';
+  const sentPassword = req.headers['x-admin-password'] || req.body.admin_password;
+  if (sentPassword !== adminPassword) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  next();
+}
+
 // Get all bookings
-app.get('/api/bookings', (req, res) => {
+app.get('/api/bookings', adminAuth, (req, res) => {
   db.all('SELECT * FROM bookings ORDER BY delivery_date DESC, delivery_time DESC', (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -333,6 +351,77 @@ app.get('/api/route/:origin/:destination', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: 'Error al calcular la ruta' });
+  }
+});
+
+// Confirm a booking
+app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Get booking details
+    const booking = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM bookings WHERE id = ?', [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    // Update status in database
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE bookings SET status = ? WHERE id = ?', ['confirmed', id], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Update Google Calendar event if it exists
+    if (booking.google_calendar_event_id) {
+      try {
+        const event = {
+          summary: `[CONFIRMADA] Entrega: ${booking.products} - ${booking.metro_station}`,
+          description: `Cliente: ${booking.customer_name}\nTeléfono: ${booking.customer_phone}\nProductos: ${booking.products}\nEstación: ${booking.metro_station}\nEstado: Confirmada`,
+          start: {
+            dateTime: moment(`${booking.delivery_date} ${booking.delivery_time}`).format(),
+            timeZone: 'America/Mexico_City',
+          },
+          end: {
+            dateTime: moment(`${booking.delivery_date} ${booking.delivery_time}`).add(30, 'minutes').format(),
+            timeZone: 'America/Mexico_City',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'email', minutes: 24 * 60 },
+              { method: 'popup', minutes: 30 },
+            ],
+          },
+        };
+
+        await calendar.events.update({
+          calendarId: 'primary',
+          eventId: booking.google_calendar_event_id,
+          resource: event,
+        });
+
+      } catch (calendarError) {
+        console.error('Error updating calendar event:', calendarError);
+        // Continue even if calendar update fails
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Reserva confirmada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error confirming booking:', error);
+    res.status(500).json({ error: 'Error al confirmar la reserva' });
   }
 });
 

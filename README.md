@@ -5,10 +5,12 @@ Sistema completo de reservas para entregas en el Metro de la Ciudad de México c
 ## ✨ Características
 
 - 🗺️ **Optimización de Rutas**: Algoritmo que calcula tiempos de tránsito entre estaciones
-- 📅 **Google Calendar**: Integración automática para crear eventos
+- 📅 **Google Calendar**: Integración automática para crear eventos con estados de confirmación
 - 🎨 **Interfaz Moderna**: Diseño responsivo y amigable
 - 📱 **Multiplataforma**: Funciona en móviles y desktop
 - 🔒 **Seguridad**: Validación de horarios y protección de datos
+- 👨‍💼 **Panel de Administración**: Gestión completa de reservas con confirmación
+- ⏰ **Validaciones**: Mínimo 1 día de anticipación y 20 minutos entre entregas
 - 🚀 **Despliegue**: Optimizado para Render
 
 ## 🛠️ Tecnologías
@@ -89,6 +91,7 @@ DATABASE_URL=./database.sqlite
 
 # Seguridad
 JWT_SECRET=tu_jwt_secret
+ADMIN_PASSWORD=tu_contraseña_admin
 ```
 
 ## 🌐 Despliegue en Render
@@ -120,6 +123,7 @@ git push origin main
 En la sección "Environment Variables" agrega:
 - `NODE_ENV=production`
 - `PORT=10000`
+- `ADMIN_PASSWORD=tu_contraseña_admin`
 - Todas las variables de Google APIs (ver sección de configuración)
 
 ## 🔐 Configuración de Google APIs
@@ -157,6 +161,7 @@ metro-cdmx-delivery/
 ├── client/                # Frontend React
 │   ├── src/
 │   │   ├── App.js         # Componente principal
+│   │   ├── AdminPanel.js  # Panel de administración
 │   │   ├── App.css        # Estilos
 │   │   └── index.js       # Punto de entrada
 │   ├── public/
@@ -187,6 +192,17 @@ npm run install-client  # Instalar dependencias del cliente
 
 ### Tablas
 - **bookings**: Reservas de entregas
+  - `id`: Identificador único
+  - `customer_name`: Nombre del cliente
+  - `customer_phone`: Teléfono del cliente
+  - `products`: Productos solicitados
+  - `metro_station`: Estación de metro
+  - `delivery_date`: Fecha de entrega
+  - `delivery_time`: Hora de entrega
+  - `status`: Estado de la reserva ('pending' o 'confirmed')
+  - `google_calendar_event_id`: ID del evento en Google Calendar
+  - `created_at`: Fecha de creación
+
 - **metro_stations**: Estaciones del Metro CDMX
 
 ### Estaciones Incluidas
@@ -199,8 +215,18 @@ npm run install-client  # Instalar dependencias del cliente
 - ✅ Selección múltiple de productos
 - ✅ Búsqueda de estaciones
 - ✅ Validación de horarios (20 min mínimo)
+- ✅ Validación de anticipación (1 día mínimo)
 - ✅ Integración con Google Calendar
+- ✅ Sistema de confirmación de reservas
 - ✅ Notificaciones en tiempo real
+
+### Panel de Administración
+- ✅ Acceso protegido por contraseña
+- ✅ Vista de todas las reservas
+- ✅ Estadísticas de reservas (total, pendientes, confirmadas)
+- ✅ Confirmación de reservas
+- ✅ Actualización automática en Google Calendar
+- ✅ Interfaz moderna y responsiva
 
 ### Optimización
 - ✅ Cálculo de rutas con Google Maps
@@ -213,17 +239,37 @@ npm run install-client  # Instalar dependencias del cliente
 - ✅ Animaciones suaves
 - ✅ Accesibilidad
 
+## 🔄 Flujo de Trabajo
+
+### 1. Usuario crea una reserva:
+- Completa el formulario (nombre, teléfono, productos, estación, fecha/hora)
+- Sistema valida: mínimo 1 día de anticipación y 20 min entre entregas
+- Se guarda en base de datos con status `pending`
+- Se crea evento en Google Calendar con título "[POR CONFIRMAR]"
+
+### 2. Admin accede al panel:
+- Inicia sesión con contraseña en `/admin`
+- Ve todas las reservas con estadísticas
+- Puede confirmar reservas pendientes
+
+### 3. Admin confirma una reserva:
+- Se actualiza status a `confirmed` en base de datos
+- Se actualiza evento en Google Calendar a "[CONFIRMADA]"
+- Se muestra notificación de éxito
+
 ## 🚨 Notas Importantes
 
 ### Seguridad
 - ⚠️ Nunca subas credenciales a GitHub
 - ⚠️ Usa solo variables de entorno
 - ⚠️ Restringe las APIs a tu dominio
+- ⚠️ Cambia la contraseña de admin por defecto
 
 ### Limitaciones
 - 📱 Solo estaciones de Líneas 1 y 2
 - ⏰ Horarios de 9:00 AM a 8:00 PM
 - 🕐 Mínimo 20 minutos entre entregas
+- 📅 Mínimo 1 día de anticipación
 
 ## 🐛 Solución de Problemas
 
@@ -240,6 +286,10 @@ npm run install-client  # Instalar dependencias del cliente
 ### Error de Base de Datos
 - Verifica que el archivo database.sqlite tenga permisos de escritura
 - Confirma que la ruta sea correcta
+
+### Error de Panel de Admin
+- Verifica que ADMIN_PASSWORD esté configurada
+- Confirma que la contraseña sea correcta
 
 ## 📞 Soporte
 
