@@ -213,7 +213,6 @@ function App() {
   // Handle category selection
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
-    setSelectedProducts({});
     if (!productsByCategory[category]) {
       fetchProductsByCategory(category);
     }
@@ -352,7 +351,7 @@ function App() {
                           <DatePicker
                             selected={selectedDate}
                             onChange={setSelectedDate}
-                            minDate={new Date()}
+                            minDate={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d; })()}
                             filterDate={(date) => {
                               const today = new Date();
                               today.setHours(0, 0, 0, 0);
