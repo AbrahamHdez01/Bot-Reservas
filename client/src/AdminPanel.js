@@ -72,6 +72,27 @@ function AdminPanel() {
     }
   };
 
+  const handleCancel = async (id) => {
+    setLoading(true);
+    try {
+      await axios.delete(`/api/bookings/${id}`, {
+        headers: { 'x-admin-password': password }
+      });
+      toast.success('Reserva cancelada exitosamente');
+      fetchBookings();
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('No autorizado. Vuelve a iniciar sesión.');
+        setIsAuthenticated(false);
+        localStorage.removeItem('adminPassword');
+      } else {
+        toast.error('Error al cancelar la reserva');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('adminPassword');
     setPassword('');
@@ -224,6 +245,13 @@ function AdminPanel() {
                           disabled={loading}
                         >
                           {loading ? 'Confirmando...' : 'Confirmar Reserva'}
+                        </button>
+                        <button
+                          onClick={() => handleCancel(booking.id)}
+                          className="cancel-btn"
+                          disabled={loading}
+                        >
+                          {loading ? 'Cancelando...' : 'Cancelar'}
                         </button>
                       </div>
                     )}
