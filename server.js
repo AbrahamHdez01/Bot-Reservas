@@ -127,16 +127,35 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-if (process.env.GOOGLE_REFRESH_TOKEN) {
+// Verificar si las credenciales de Google Calendar están configuradas
+const googleCalendarConfigured = process.env.GOOGLE_CLIENT_ID && 
+                                process.env.GOOGLE_CLIENT_SECRET && 
+                                process.env.GOOGLE_REFRESH_TOKEN;
+
+if (googleCalendarConfigured) {
   oauth2Client.setCredentials({
     refresh_token: process.env.GOOGLE_REFRESH_TOKEN
   });
+  console.log('✅ Google Calendar configurado correctamente');
+} else {
+  console.log('⚠️ Google Calendar no configurado - las reservas se guardarán solo en la base de datos');
 }
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
 // Route optimization using Google Maps API
 async function getTransitTime(origin, destination) {
+  // Si no hay API key de Google Maps, devolver valores simulados
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    console.log('Google Maps API key no configurada, usando valores simulados');
+    return {
+      duration: 1800, // 30 minutos en segundos
+      durationText: '30 min',
+      distance: 5000, // 5 km en metros
+      distanceText: '5.0 km'
+    };
+  }
+
   try {
     const response = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
       params: {
@@ -161,7 +180,13 @@ async function getTransitTime(origin, destination) {
     return null;
   } catch (error) {
     console.error('Error getting transit time:', error);
-    return null;
+    // En caso de error, devolver valores simulados
+    return {
+      duration: 1800, // 30 minutos en segundos
+      durationText: '30 min',
+      distance: 5000, // 5 km en metros
+      distanceText: '5.0 km'
+    };
   }
 }
 
@@ -261,49 +286,58 @@ app.post('/api/bookings', async (req, res) => {
     });
 
     // Create Google Calendar event
-    try {
-      const event = {
-        summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
-        description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
-        start: {
-          dateTime: moment(`${delivery_date} ${delivery_time}`).format(),
-          timeZone: 'America/Mexico_City',
-        },
-        end: {
-          dateTime: moment(`${delivery_date} ${delivery_time}`).add(30, 'minutes').format(),
-          timeZone: 'America/Mexico_City',
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 30 },
-          ],
-        },
-      };
+    if (googleCalendarConfigured) {
+      try {
+        const event = {
+          summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
+          description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
+          start: {
+            dateTime: moment(`${delivery_date} ${delivery_time}`).format(),
+            timeZone: 'America/Mexico_City',
+          },
+          end: {
+            dateTime: moment(`${delivery_date} ${delivery_time}`).add(30, 'minutes').format(),
+            timeZone: 'America/Mexico_City',
+          },
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: 'email', minutes: 24 * 60 },
+              { method: 'popup', minutes: 30 },
+            ],
+          },
+        };
 
-      const calendarResponse = await calendar.events.insert({
-        calendarId: 'primary',
-        resource: event,
-      });
+        const calendarResponse = await calendar.events.insert({
+          calendarId: 'primary',
+          resource: event,
+        });
 
-      // Update booking with Google Calendar event ID
-      db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
-        [calendarResponse.data.id, result]);
+        // Update booking with Google Calendar event ID
+        db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
+          [calendarResponse.data.id, result]);
 
+        res.json({
+          success: true,
+          booking_id: result,
+          calendar_event_id: calendarResponse.data.id,
+          message: 'Reserva creada exitosamente y agregada al calendario'
+        });
+
+      } catch (calendarError) {
+        console.error('Error creating calendar event:', calendarError);
+        res.json({
+          success: true,
+          booking_id: result,
+          message: 'Reserva creada exitosamente (error al crear evento en calendario)'
+        });
+      }
+    } else {
+      // Si Google Calendar no está configurado, solo guardar en base de datos
       res.json({
         success: true,
         booking_id: result,
-        calendar_event_id: calendarResponse.data.id,
-        message: 'Reserva creada exitosamente y agregada al calendario'
-      });
-
-    } catch (calendarError) {
-      console.error('Error creating calendar event:', calendarError);
-      res.json({
-        success: true,
-        booking_id: result,
-        message: 'Reserva creada exitosamente (error al crear evento en calendario)'
+        message: 'Reserva creada exitosamente (Google Calendar no configurado)'
       });
     }
 
@@ -380,7 +414,7 @@ app.post('/api/bookings/:id/confirm', adminAuth, async (req, res) => {
     });
 
     // Update Google Calendar event if it exists
-    if (booking.google_calendar_event_id) {
+    if (booking.google_calendar_event_id && googleCalendarConfigured) {
       try {
         const event = {
           summary: `[CONFIRMADA] Entrega: ${booking.products} - ${booking.metro_station}`,

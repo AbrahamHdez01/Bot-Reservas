@@ -73,13 +73,13 @@ npm start
 Crea un archivo `.env` en la raíz del proyecto:
 
 ```bash
-# Google Calendar API
+# Google Calendar API (OPCIONAL - la app funciona sin esto)
 GOOGLE_CLIENT_ID=tu_client_id
 GOOGLE_CLIENT_SECRET=tu_client_secret
 GOOGLE_REDIRECT_URI=tu_redirect_uri
 GOOGLE_REFRESH_TOKEN=tu_refresh_token
 
-# Google Maps API
+# Google Maps API (OPCIONAL - la app funciona sin esto)
 GOOGLE_MAPS_API_KEY=tu_maps_api_key
 
 # Servidor
@@ -93,6 +93,20 @@ DATABASE_URL=./database.sqlite
 JWT_SECRET=tu_jwt_secret
 ADMIN_PASSWORD=tu_contraseña_admin
 ```
+
+### 🔧 Configuración Mínima
+
+**Para que la aplicación funcione básicamente, solo necesitas:**
+```bash
+PORT=5000
+NODE_ENV=development
+ADMIN_PASSWORD=tu_contraseña_admin
+```
+
+**Las APIs de Google son opcionales:**
+- **Sin Google Calendar**: Las reservas se guardan solo en la base de datos
+- **Sin Google Maps**: Se usan tiempos simulados para las rutas
+- **Con ambas APIs**: Funcionalidad completa con calendario y rutas reales
 
 ## 🌐 Despliegue en Render
 
