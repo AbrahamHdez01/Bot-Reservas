@@ -446,6 +446,19 @@ app.post('/api/bookings', async (req, res) => {
       }
     }
 
+    // Validar número telefónico de 10 dígitos
+    const phoneDigits = (customer_phone || '').replace(/\D/g, ''); // quitar espacios, guiones, etc.
+    if (phoneDigits.length !== 10) {
+      return res.status(400).json({ error: 'El número telefónico debe contener exactamente 10 dígitos.' });
+    }
+
+    // Validar que la fecha no sea fin de semana (sábado = 6, domingo = 0)
+    const deliveryMoment = moment.tz(delivery_date, 'YYYY-MM-DD', 'America/Mexico_City');
+    const dayOfWeek = deliveryMoment.day();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return res.status(400).json({ error: 'No se permiten reservaciones en fines de semana (sábado o domingo).' });
+    }
+
     // Insert booking into database
     const result = await new Promise((resolve, reject) => {
       db.run(
