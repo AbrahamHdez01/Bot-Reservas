@@ -373,6 +373,12 @@ app.get('/api/products/:category', (req, res) => {
 app.get('/api/available-slots/:date', (req, res) => {
   const { date } = req.params;
   
+  // Bloquear fechas pasadas Y fines de semana (sábado=6, domingo=0)
+  const dayOfWeek = moment.tz(date, 'YYYY-MM-DD', 'America/Mexico_City').day();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return res.json([]); // No hay horarios disponibles en fin de semana
+  }
+
   // Generate time slots from 10 AM to 6 PM (18:00)
   const slots = [];
   for (let hour = 10; hour <= 17; hour++) { // Cambiar a <= 17 para incluir hasta 17:30

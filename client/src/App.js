@@ -395,7 +395,9 @@ function App() {
                             filterDate={(date) => {
                               const today = new Date();
                               today.setHours(0, 0, 0, 0);
-                              return date > today;
+                              // Bloquear fechas pasadas Y fines de semana (sábado=6, domingo=0)
+                              const dayOfWeek = date.getDay();
+                              return date > today && dayOfWeek !== 0 && dayOfWeek !== 6;
                             }}
                             dateFormat="dd/MM/yyyy"
                             placeholderText="Selecciona una fecha"
