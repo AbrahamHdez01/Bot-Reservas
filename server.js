@@ -138,14 +138,56 @@ const googleCalendarConfigured = process.env.GOOGLE_CLIENT_ID &&
                                 process.env.GOOGLE_CLIENT_SECRET && 
                                 process.env.GOOGLE_REFRESH_TOKEN;
 
+// Función para renovar token automáticamente
+const refreshAccessToken = async () => {
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    console.log('🔄 Token renovado automáticamente');
+    if (credentials.access_token) {
+      console.log('✅ Nuevo access token generado');
+    }
+    return credentials.access_token;
+  } catch (error) {
+    console.error('❌ Error renovando token:', error.message);
+    return null;
+  }
+};
+
+// Función para verificar si el token necesita renovación
+const ensureValidToken = async () => {
+  try {
+    const tokenInfo = await oauth2Client.getAccessToken();
+    if (!tokenInfo.token) {
+      console.log('🔄 Token no válido, renovando...');
+      return await refreshAccessToken();
+    }
+    return tokenInfo.token;
+  } catch (error) {
+    console.log('🔄 Error obteniendo token, renovando...');
+    return await refreshAccessToken();
+  }
+};
+
 if (googleCalendarConfigured) {
   oauth2Client.setCredentials({
     refresh_token: process.env.GOOGLE_REFRESH_TOKEN
   });
+  
+  // Configurar renovación automática cada 50 minutos (los tokens duran 1 hora)
+  setInterval(async () => {
+    await refreshAccessToken();
+  }, 50 * 60 * 1000); // 50 minutos
+  
+  // Renovar token al inicio
+  setTimeout(async () => {
+    await refreshAccessToken();
+  }, 5000); // Esperar 5 segundos después del inicio
+  
   console.log('✅ Google Calendar configurado correctamente');
   console.log('📅 Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Configurado' : 'Faltante');
   console.log('🔑 Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Configurado' : 'Faltante');
   console.log('🔄 Refresh Token:', process.env.GOOGLE_REFRESH_TOKEN ? 'Configurado' : 'Faltante');
+  console.log('⏰ Renovación automática configurada cada 50 minutos');
 } else {
   console.log('⚠️ Google Calendar no configurado - las reservas se guardarán solo en la base de datos');
   console.log('📅 Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Configurado' : 'Faltante');
@@ -195,6 +237,13 @@ async function syncBookingsFromCalendar() {
 
   try {
     console.log('🔄 Sincronizando reservas desde Google Calendar…');
+    
+    // Asegurar token válido antes de sincronizar
+    const validToken = await ensureValidToken();
+    if (!validToken) {
+      console.error('❌ No se pudo obtener token válido para sincronización');
+      return;
+    }
 
     // Consultar eventos de los últimos 12 meses y los próximos 12 meses
     const timeMin = moment().subtract(12, 'months').startOf('day').toISOString();
@@ -481,6 +530,13 @@ app.post('/api/bookings', async (req, res) => {
     if (googleCalendarConfigured) {
       try {
         console.log('📅 Intentando crear evento en Google Calendar...');
+        
+        // Asegurar que tenemos un token válido antes de crear el evento
+        const validToken = await ensureValidToken();
+        if (!validToken) {
+          throw new Error('No se pudo obtener un token de acceso válido');
+        }
+        
         const event = {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
@@ -501,12 +557,16 @@ app.post('/api/bookings', async (req, res) => {
           },
         };
 
+        console.log(' Creando evento con fecha:', delivery_date, 'hora:', delivery_time);
+
         const calendarResponse = await calendar.events.insert({
           calendarId: 'primary',
           resource: event,
+          sendNotifications: true, // Enviar notificaciones por email
         });
 
         console.log('✅ Evento creado en Google Calendar:', calendarResponse.data.id);
+        console.log(' Link del evento:', calendarResponse.data.htmlLink);
 
         // Update booking with Google Calendar event ID
         db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
@@ -516,10 +576,46 @@ app.post('/api/bookings', async (req, res) => {
           success: true,
           booking_id: result,
           calendar_event_id: calendarResponse.data.id,
+          calendar_link: calendarResponse.data.htmlLink,
           message: 'Reserva creada exitosamente y agregada al calendario'
         });
 
       } catch (calendarError) {
+        // Manejar errores específicos de autenticación
+        if (calendarError.code === 401 || calendarError.code === 403) {
+          console.error('❌ Error de autenticación con Google Calendar');
+          console.error(' Intentando renovar token y reintentar...');
+          
+          try {
+            // Intentar renovar token y crear evento nuevamente
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+              console.log(' Reintentando crear evento con nuevo token...');
+              const retryResponse = await calendar.events.insert({
+                calendarId: 'primary',
+                resource: event,
+                sendNotifications: true,
+              });
+              
+              console.log('✅ Evento creado en segundo intento:', retryResponse.data.id);
+              
+              // Update booking with Google Calendar event ID
+              db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
+                [retryResponse.data.id, result]);
+              
+              return res.json({
+                success: true,
+                booking_id: result,
+                calendar_event_id: retryResponse.data.id,
+                calendar_link: retryResponse.data.htmlLink,
+                message: 'Reserva creada exitosamente y agregada al calendario (segundo intento)'
+              });
+            }
+          } catch (retryError) {
+            console.error('❌ Error en segundo intento:', retryError.message);
+          }
+        }
+        
         console.error('❌ Error creating calendar event:', calendarError.message);
         console.error('📋 Error details:', calendarError.response?.data || calendarError);
         res.json({
