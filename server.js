@@ -695,6 +695,11 @@ app.delete('/api/bookings/:id', adminAuth, async (req, res) => {
   }
 });
 
+// === Página de Política de Privacidad ===
+app.get('/privacy', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build', 'privacy.html'));
+});
+
 // Serve React app
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
