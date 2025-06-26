@@ -238,13 +238,6 @@ async function syncBookingsFromCalendar() {
   try {
     console.log('🔄 Sincronizando reservas desde Google Calendar…');
     
-    // Asegurar token válido antes de sincronizar
-    const validToken = await ensureValidToken();
-    if (!validToken) {
-      console.error('❌ No se pudo obtener token válido para sincronización');
-      return;
-    }
-
     // Consultar eventos de los últimos 12 meses y los próximos 12 meses
     const timeMin = moment().subtract(12, 'months').startOf('day').toISOString();
     const timeMax = moment().add(12, 'months').endOf('day').toISOString();
@@ -531,12 +524,6 @@ app.post('/api/bookings', async (req, res) => {
       try {
         console.log('📅 Intentando crear evento en Google Calendar...');
         
-        // Asegurar que tenemos un token válido antes de crear el evento
-        const validToken = await ensureValidToken();
-        if (!validToken) {
-          throw new Error('No se pudo obtener un token de acceso válido');
-        }
-        
         const event = {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
@@ -562,7 +549,6 @@ app.post('/api/bookings', async (req, res) => {
         const calendarResponse = await calendar.events.insert({
           calendarId: 'primary',
           resource: event,
-          sendNotifications: true, // Enviar notificaciones por email
         });
 
         console.log('✅ Evento creado en Google Calendar:', calendarResponse.data.id);
@@ -581,41 +567,6 @@ app.post('/api/bookings', async (req, res) => {
         });
 
       } catch (calendarError) {
-        // Manejar errores específicos de autenticación
-        if (calendarError.code === 401 || calendarError.code === 403) {
-          console.error('❌ Error de autenticación con Google Calendar');
-          console.error(' Intentando renovar token y reintentar...');
-          
-          try {
-            // Intentar renovar token y crear evento nuevamente
-            const newToken = await refreshAccessToken();
-            if (newToken) {
-              console.log(' Reintentando crear evento con nuevo token...');
-              const retryResponse = await calendar.events.insert({
-                calendarId: 'primary',
-                resource: event,
-                sendNotifications: true,
-              });
-              
-              console.log('✅ Evento creado en segundo intento:', retryResponse.data.id);
-              
-              // Update booking with Google Calendar event ID
-              db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
-                [retryResponse.data.id, result]);
-              
-              return res.json({
-                success: true,
-                booking_id: result,
-                calendar_event_id: retryResponse.data.id,
-                calendar_link: retryResponse.data.htmlLink,
-                message: 'Reserva creada exitosamente y agregada al calendario (segundo intento)'
-              });
-            }
-          } catch (retryError) {
-            console.error('❌ Error en segundo intento:', retryError.message);
-          }
-        }
-        
         console.error('❌ Error creating calendar event:', calendarError.message);
         console.error('📋 Error details:', calendarError.response?.data || calendarError);
         res.json({
