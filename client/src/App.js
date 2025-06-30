@@ -47,21 +47,28 @@ function App() {
     const fetchData = async () => {
       try {
         const [stationsResponse, categoriesResponse] = await Promise.all([
-          fetch('/api/stations'),
+          fetch('/api/metro-stations'),
           fetch('/api/categories')
         ]);
         
         if (stationsResponse.ok) {
           const stationsData = await stationsResponse.json();
-          // Convertir a formato para Select
-          const stationOptions = stationsData.map(station => ({
-            value: station.name,
-            label: `${station.name} (Línea ${station.line})`,
-            name: station.name,
-            line: station.line,
-            coordinates: { lat: station.latitude, lng: station.longitude }
-          }));
-          setStations(stationOptions);
+          
+          if (stationsData.success && stationsData.stations) {
+            // Convertir a formato para Select
+            const stationOptions = stationsData.stations.map(station => ({
+              value: station.name,
+              label: `${station.name.replace(', Ciudad de México, CDMX, México', '').replace(', Estado de México, México', '')} (Línea ${station.line})`,
+              name: station.name,
+              line: station.line,
+              available: station.available
+            }));
+            setStations(stationOptions);
+            console.log(`✅ ${stationsData.total} estaciones disponibles cargadas`);
+          }
+        } else {
+          console.error('Error al cargar estaciones');
+          toast.error('Error al cargar las estaciones del metro');
         }
         
         if (categoriesResponse.ok) {
@@ -70,6 +77,7 @@ function App() {
         }
       } catch (error) {
         console.error('Error fetching initial data:', error);
+        toast.error('Error al conectar con el servidor');
       }
     };
     

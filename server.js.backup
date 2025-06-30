@@ -7,7 +7,6 @@ const sqlite3 = require('sqlite3').verbose();
 const { google } = require('googleapis');
 const axios = require('axios');
 const moment = require('moment-timezone');
-const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -239,6 +238,13 @@ async function syncBookingsFromCalendar() {
   try {
     console.log('🔄 Sincronizando reservas desde Google Calendar…');
     
+    // Asegurar token válido antes de sincronizar
+    const validToken = await ensureValidToken();
+    if (!validToken) {
+      console.error('❌ No se pudo obtener token válido para sincronización');
+      return;
+    }
+
     // Consultar eventos de los últimos 12 meses y los próximos 12 meses
     const timeMin = moment().subtract(12, 'months').startOf('day').toISOString();
     const timeMax = moment().add(12, 'months').endOf('day').toISOString();
@@ -382,105 +388,9 @@ async function getTransitTime(origin, destination) {
   }
 }
 
-// Cargar estaciones del Metro CDMX
-let metroStations = {};
-try {
-  const metroStationsData = fs.readFileSync('./metro_stations.json', 'utf8');
-  metroStations = JSON.parse(metroStationsData);
-  console.log('✅ Estaciones del Metro CDMX cargadas correctamente');
-} catch (error) {
-  console.error('❌ Error cargando estaciones del metro:', error.message);
-}
-
 // API Routes
 
-// Get available metro stations (only those marked as available)
-app.get('/api/metro-stations', (req, res) => {
-  try {
-    const availableStations = [];
-    
-    // Recorrer todas las líneas y filtrar solo estaciones disponibles
-    Object.keys(metroStations).forEach(line => {
-      const stationsInLine = metroStations[line];
-      stationsInLine.forEach(station => {
-        if (station.available) {
-          availableStations.push({
-            name: station.name,
-            line: line,
-            available: station.available
-          });
-        }
-      });
-    });
-
-    res.json({
-      success: true,
-      stations: availableStations,
-      total: availableStations.length
-    });
-  } catch (error) {
-    console.error('Error obteniendo estaciones:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las estaciones del metro' 
-    });
-  }
-});
-
-// Get stations by line
-app.get('/api/metro-stations/line/:lineNumber', (req, res) => {
-  try {
-    const { lineNumber } = req.params;
-    
-    if (!metroStations[lineNumber]) {
-      return res.status(404).json({
-        success: false,
-        error: `Línea ${lineNumber} no encontrada`
-      });
-    }
-
-    const stationsInLine = metroStations[lineNumber].filter(station => station.available);
-    
-    res.json({
-      success: true,
-      line: lineNumber,
-      stations: stationsInLine,
-      total: stationsInLine.length
-    });
-  } catch (error) {
-    console.error('Error obteniendo estaciones por línea:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las estaciones de la línea' 
-    });
-  }
-});
-
-// Get all metro lines
-app.get('/api/metro-lines', (req, res) => {
-  try {
-    const lines = Object.keys(metroStations).map(line => ({
-      number: line,
-      name: `Línea ${line}`,
-      totalStations: metroStations[line].length,
-      availableStations: metroStations[line].filter(s => s.available).length
-    }));
-
-    res.json({
-      success: true,
-      lines: lines,
-      total: lines.length
-    });
-  } catch (error) {
-    console.error('Error obteniendo líneas:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las líneas del metro' 
-    });
-  }
-});
-
-// Mantener el endpoint legacy para compatibilidad
+// Get all metro stations
 app.get('/api/stations', (req, res) => {
   db.all('SELECT * FROM metro_stations ORDER BY line, name', (err, rows) => {
     if (err) {
@@ -621,6 +531,12 @@ app.post('/api/bookings', async (req, res) => {
       try {
         console.log('📅 Intentando crear evento en Google Calendar...');
         
+        // Asegurar que tenemos un token válido antes de crear el evento
+        const validToken = await ensureValidToken();
+        if (!validToken) {
+          throw new Error('No se pudo obtener un token de acceso válido');
+        }
+        
         const event = {
           summary: `[POR CONFIRMAR] Entrega: ${products} - ${metro_station}`,
           description: `Cliente: ${customer_name}\nTeléfono: ${customer_phone}\nProductos: ${products}\nEstación: ${metro_station}\nEstado: Por confirmar`,
@@ -646,6 +562,7 @@ app.post('/api/bookings', async (req, res) => {
         const calendarResponse = await calendar.events.insert({
           calendarId: 'primary',
           resource: event,
+          sendNotifications: true, // Enviar notificaciones por email
         });
 
         console.log('✅ Evento creado en Google Calendar:', calendarResponse.data.id);
@@ -664,6 +581,41 @@ app.post('/api/bookings', async (req, res) => {
         });
 
       } catch (calendarError) {
+        // Manejar errores específicos de autenticación
+        if (calendarError.code === 401 || calendarError.code === 403) {
+          console.error('❌ Error de autenticación con Google Calendar');
+          console.error(' Intentando renovar token y reintentar...');
+          
+          try {
+            // Intentar renovar token y crear evento nuevamente
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+              console.log(' Reintentando crear evento con nuevo token...');
+              const retryResponse = await calendar.events.insert({
+                calendarId: 'primary',
+                resource: event,
+                sendNotifications: true,
+              });
+              
+              console.log('✅ Evento creado en segundo intento:', retryResponse.data.id);
+              
+              // Update booking with Google Calendar event ID
+              db.run('UPDATE bookings SET google_calendar_event_id = ? WHERE id = ?', 
+                [retryResponse.data.id, result]);
+              
+              return res.json({
+                success: true,
+                booking_id: result,
+                calendar_event_id: retryResponse.data.id,
+                calendar_link: retryResponse.data.htmlLink,
+                message: 'Reserva creada exitosamente y agregada al calendario (segundo intento)'
+              });
+            }
+          } catch (retryError) {
+            console.error('❌ Error en segundo intento:', retryError.message);
+          }
+        }
+        
         console.error('❌ Error creating calendar event:', calendarError.message);
         console.error('📋 Error details:', calendarError.response?.data || calendarError);
         res.json({
