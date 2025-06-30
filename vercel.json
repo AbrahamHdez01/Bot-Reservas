@@ -4,10 +4,12 @@
     {
       "src": "client/package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "build" }
+      "config": { 
+        "distDir": "build"
+      }
     },
     {
-      "src": "package.json",
+      "src": "server.js",
       "use": "@vercel/node"
     }
   ],
@@ -17,20 +19,32 @@
       "dest": "/server.js"
     },
     {
-      "src": "/admin",
-      "dest": "/client/build/index.html"
+      "src": "/static/(.*)",
+      "dest": "/client/build/static/$1"
     },
     {
       "src": "/privacy",
       "dest": "/client/build/privacy.html"
     },
     {
-      "src": "/terms",
+      "src": "/terms", 
       "dest": "/client/build/terms.html"
     },
     {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot))",
-      "dest": "/client/build/$1"
+      "src": "/admin",
+      "dest": "/client/build/index.html"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/client/build/favicon.ico"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/client/build/manifest.json"
+    },
+    {
+      "src": "/logo192.png",
+      "dest": "/client/build/logo192.png"
     },
     {
       "src": "/(.*)",
