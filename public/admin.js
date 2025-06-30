@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Cargar estaciones para el filtro
 async function cargarEstaciones() {
   try {
-    const metroStations = await fetch('metro_stations.json').then(r => r.json());
+    const metroStations = await fetch('/metro_stations.json').then(r => r.json());
     const estaciones = [];
     Object.entries(metroStations).forEach(([linea, stations]) => {
       stations.forEach(station => {

@@ -1,7 +1,7 @@
 // Cargar estaciones y productos
 async function cargarDatos() {
-  const metroStations = await fetch('metro_stations.json').then(r => r.json());
-  const productos = await fetch('productos.json').then(r => r.json());
+  const metroStations = await fetch('/metro_stations.json').then(r => r.json());
+  const productos = await fetch('/productos.json').then(r => r.json());
   
   // Filtrar solo estaciones disponibles y aplanar la estructura
   const estaciones = [];
