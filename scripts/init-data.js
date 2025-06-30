@@ -18,4 +18,11 @@ if (!fs.existsSync(dataPath)) {
   console.log('Archivo reservas.json ya existe');
 }
 
+// Asegurar que el directorio public existe
+const publicDir = path.join(process.cwd(), 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+  console.log('Directorio public creado');
+}
+
 console.log('Inicialización de datos completada'); 
