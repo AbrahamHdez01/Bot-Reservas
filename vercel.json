@@ -30,6 +30,10 @@
       "dest": "/client/build/privacy.html"
     },
     {
+      "src": "/terms",
+      "dest": "/client/build/terms.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/client/build/$1"
     }
