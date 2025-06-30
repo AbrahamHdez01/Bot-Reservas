@@ -2,7 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    },
+    {
+      "src": "server.js",
       "use": "@vercel/node"
     }
   ],
@@ -12,8 +19,20 @@
       "dest": "/server.js"
     },
     {
+      "src": "/admin",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/privacy",
+      "dest": "/privacy.html"
+    },
+    {
+      "src": "/terms",
+      "dest": "/terms.html"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "/index.html"
     }
   ]
 } 
