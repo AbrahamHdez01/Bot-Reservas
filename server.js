@@ -390,17 +390,17 @@ try {
 
 // Get available metro stations (only those marked as available)
 app.get('/api/metro-stations', (req, res) => {
-  db.all('SELECT * FROM metro_stations ORDER BY line, name', (err, rows) => {
+  db.all('SELECT * FROM metro_stations WHERE available = 1 ORDER BY line, name', (err, rows) => {
     if (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
-    // Si tienes un campo 'available', filtra aquí. Si no, asume que todas están disponibles.
     const stations = rows.map(station => ({
       name: station.name,
       line: station.line,
       latitude: station.latitude,
       longitude: station.longitude,
-      available: true // O usa station.available si existe
+      available: !!station.available,
+      reason: station.reason || null
     }));
     res.json({
       success: true,
