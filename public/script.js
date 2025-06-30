@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     cargarEstaciones();
     configurarNavegacion();
     configurarFormulario();
+    configurarSelectorProductos();
     actualizarCarrito();
 });
 
@@ -37,59 +38,60 @@ async function cargarProductos() {
     try {
         const response = await fetch('/productos.json');
         productos = await response.json();
-        mostrarProductosPorCategoria();
+        llenarSelectorCategorias();
     } catch (error) {
         console.error('Error cargando productos:', error);
         mostrarError('Error cargando productos');
     }
 }
 
-// Mostrar productos agrupados por categoría
-function mostrarProductosPorCategoria() {
-    const productsGrid = document.getElementById('productsGrid');
-    productsGrid.innerHTML = '';
-
+// Llenar selector de categorías
+function llenarSelectorCategorias() {
+    const categoriaSelect = document.getElementById('categoriaSelect');
+    categoriaSelect.innerHTML = '<option value="">Selecciona una categoría</option>';
     for (const categoria in productos) {
         if (!productos.hasOwnProperty(categoria)) continue;
-        const categoriaDiv = document.createElement('div');
-        categoriaDiv.className = 'categoria-productos';
-        categoriaDiv.innerHTML = `<h3 style="margin-bottom: 0.5rem; color: var(--primary-color); text-transform: capitalize;">${categoria.replace('_', ' ')}</h3>`;
-
-        productos[categoria].forEach(producto => {
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card';
-            productCard.innerHTML = `
-                <div class="product-info">
-                    <h4 style="margin-bottom: 0.5rem;">${producto.nombre}</h4>
-                    <div class="product-price">$${producto.precio}</div>
-                    <div class="product-actions">
-                        <div class="quantity-controls">
-                            <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', -1)">-</button>
-                            <span class="quantity-display" id="qty-${producto.id}">0</span>
-                            <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', 1)">+</button>
-                        </div>
-                        <button class="add-to-cart-btn" onclick="agregarAlCarrito('${producto.id}')">
-                            Agregar
-                        </button>
-                    </div>
-                </div>
-            `;
-            categoriaDiv.appendChild(productCard);
-        });
-        productsGrid.appendChild(categoriaDiv);
+        const option = document.createElement('option');
+        option.value = categoria;
+        option.textContent = categoria.replace('_', ' ').toUpperCase();
+        categoriaSelect.appendChild(option);
     }
 }
 
-// Cambiar cantidad de producto
-function cambiarCantidad(productoId, cambio) {
-    const display = document.getElementById(`qty-${productoId}`);
-    let cantidad = parseInt(display.textContent) + cambio;
-    cantidad = Math.max(0, cantidad);
-    display.textContent = cantidad;
+// Llenar selector de productos según categoría
+function llenarSelectorProductos() {
+    const categoria = document.getElementById('categoriaSelect').value;
+    const productoSelect = document.getElementById('productoSelect');
+    productoSelect.innerHTML = '<option value="">Selecciona un producto</option>';
+    if (!categoria || !productos[categoria]) return;
+    productos[categoria].forEach(producto => {
+        const option = document.createElement('option');
+        option.value = producto.id;
+        option.textContent = `${producto.nombre} ($${producto.precio})`;
+        productoSelect.appendChild(option);
+    });
 }
 
-// Agregar al carrito
-function agregarAlCarrito(productoId) {
+// Configurar lógica de selección de productos
+function configurarSelectorProductos() {
+    const categoriaSelect = document.getElementById('categoriaSelect');
+    const productoSelect = document.getElementById('productoSelect');
+    const addProductForm = document.getElementById('addProductForm');
+
+    categoriaSelect.addEventListener('change', llenarSelectorProductos);
+    addProductForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const categoria = categoriaSelect.value;
+        const productoId = productoSelect.value;
+        if (!categoria || !productoId) return;
+        agregarAlCarrito(productoId, 1);
+        // Resetear selección de producto
+        productoSelect.value = '';
+    });
+}
+
+// Agregar al carrito (cantidad opcional, por defecto 1)
+function agregarAlCarrito(productoId, cantidad = 1) {
     let producto = null;
     for (const categoria in productos) {
         if (!productos.hasOwnProperty(categoria)) continue;
@@ -98,14 +100,7 @@ function agregarAlCarrito(productoId) {
     }
     if (!producto) return;
 
-    const cantidad = parseInt(document.getElementById(`qty-${productoId}`).textContent);
-    if (cantidad === 0) {
-        mostrarError('Selecciona una cantidad mayor a 0');
-        return;
-    }
-
     const itemExistente = carrito.find(item => item.id === productoId);
-
     if (itemExistente) {
         itemExistente.cantidad += cantidad;
     } else {
@@ -116,10 +111,6 @@ function agregarAlCarrito(productoId) {
             cantidad: cantidad
         });
     }
-
-    // Resetear cantidad
-    document.getElementById(`qty-${productoId}`).textContent = '0';
-    
     actualizarCarrito();
     mostrarExito('Producto agregado al carrito');
 }
@@ -192,8 +183,6 @@ function goToReservation() {
         mostrarError('Agrega productos al carrito primero');
         return;
     }
-
-    // Cambiar a la pestaña de reserva
     document.querySelector('[data-tab="reservation"]').click();
 }
 
@@ -230,6 +219,7 @@ function configurarFormulario() {
     const form = document.getElementById('reservationForm');
     const fechaInput = document.getElementById('fecha');
     const horaSelect = document.getElementById('hora');
+    const estacionSelect = document.getElementById('estacion');
 
     // Configurar fecha mínima (hoy)
     const hoy = new Date().toISOString().split('T')[0];
@@ -240,6 +230,9 @@ function configurarFormulario() {
 
     // Evento de cambio de fecha
     fechaInput.addEventListener('change', llenarHorasDisponibles);
+    
+    // Evento de cambio de estación
+    estacionSelect.addEventListener('change', llenarHorasDisponibles);
 
     // Evento de envío del formulario
     form.addEventListener('submit', async (e) => {
@@ -322,6 +315,37 @@ async function crearReserva() {
         return;
     }
 
+    // Validar fecha (no permitir fechas pasadas)
+    const fechaSeleccionada = new Date(datos.fecha);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (fechaSeleccionada < hoy) {
+        mostrarError('No puedes seleccionar una fecha pasada');
+        return;
+    }
+
+    // Validar horario según estación
+    const estacion = datos.estacion.toLowerCase();
+    const horaSeleccionada = datos.hora;
+    let horaInicio = 10;
+    let horaFin = 17;
+    
+    // Ajustar hora de inicio según estación
+    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
+        horaInicio = 8.5;
+    } else if (["periférico oriente", "atlalilco"].some(n => estacion.includes(n))) {
+        horaInicio = 8.5;
+    } else if (["mixcoac", "polanco"].some(n => estacion.includes(n))) {
+        horaInicio = 8.5;
+    }
+
+    // Convertir hora seleccionada a formato numérico para validación
+    const horaNum = parseHoraToNumero(horaSeleccionada);
+    if (horaNum < horaInicio || horaNum > horaFin) {
+        mostrarError(`Para la estación ${datos.estacion}, los horarios disponibles son de ${formatearHora(horaInicio)} a ${formatearHora(horaFin)}`);
+        return;
+    }
+
     try {
         // Crear evento en Google Calendar
         const calendarResponse = await fetch('/api/calendar', {
@@ -372,6 +396,24 @@ async function crearReserva() {
         console.error('Error:', error);
         mostrarError('Error de conexión. Intenta de nuevo.');
     }
+}
+
+// Convertir hora formateada a número para validación
+function parseHoraToNumero(horaFormateada) {
+    const match = horaFormateada.match(/(\d+):(\d+)\s*(AM|PM)/);
+    if (!match) return 0;
+    
+    let horas = parseInt(match[1]);
+    const minutos = parseInt(match[2]);
+    const ampm = match[3];
+    
+    if (ampm === 'PM' && horas !== 12) {
+        horas += 12;
+    } else if (ampm === 'AM' && horas === 12) {
+        horas = 0;
+    }
+    
+    return horas + (minutos / 60);
 }
 
 // Mostrar confirmación

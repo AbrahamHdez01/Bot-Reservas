@@ -27,9 +27,21 @@
             <!-- Pestaña Productos -->
             <section id="products-tab" class="tab-content active">
                 <div class="products-container">
-                    <div class="products-grid" id="productsGrid">
-                        <!-- Los productos se cargarán dinámicamente -->
-                    </div>
+                    <form id="addProductForm" class="add-product-form">
+                        <div class="form-group">
+                            <label for="categoriaSelect">Categoría</label>
+                            <select id="categoriaSelect" name="categoria" required style="background: var(--surface-color); color: var(--primary-color); font-weight: 600;">
+                                <option value="">Selecciona una categoría</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="productoSelect">Producto</label>
+                            <select id="productoSelect" name="producto" required style="background: var(--surface-color); color: var(--primary-color); font-weight: 600;">
+                                <option value="">Selecciona un producto</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary btn-full" style="margin-top: 0.5rem;">Agregar al carrito</button>
+                    </form>
                 </div>
             </section>
 
