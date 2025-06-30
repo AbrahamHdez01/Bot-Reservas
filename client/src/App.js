@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
 import DatePicker from 'react-datepicker';
 import Select from 'react-select';
 import { toast, Toaster } from 'react-hot-toast';
 import { 
   MapPin, 
-  Clock, 
   Package, 
   User, 
-  Phone, 
   Calendar,
   Train
 } from 'lucide-react';
@@ -20,7 +17,6 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 function App() {
   const [stations, setStations] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [selectedStation, setSelectedStation] = useState(null);
@@ -33,14 +29,6 @@ function App() {
     customer_name: '',
     customer_phone: ''
   });
-  const [loading, setLoading] = useState(false);
-
-  const productOptions = [
-    { value: 'perfume', label: 'Perfume' },
-    { value: 'bolsa', label: 'Bolsa' },
-    { value: 'body_mist', label: 'Body Mist' },
-    { value: 'complemento', label: 'Complemento' }
-  ];
 
   useEffect(() => {
     // Fetch stations and categories on component mount
@@ -131,9 +119,9 @@ function App() {
       
       fetchSlots();
     }
-  }, [selectedDate, selectedStation]);
+  }, [selectedDate, selectedStation, getAvailableSlots]);
 
-  const getAvailableSlots = async (date, station = null) => {
+  const getAvailableSlots = useCallback(async (date, station = null) => {
     try {
       let url = `/api/available-slots/${date}`;
       if (station) {
@@ -154,7 +142,7 @@ function App() {
       // Fallback to generated slots
       return generateTimeSlots();
     }
-  };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -228,18 +216,7 @@ function App() {
     return slots;
   };
 
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const categoriesData = await response.json();
-        setCategories(categoriesData);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
+
 
   // Fetch products by category
   const fetchProductsByCategory = async (category) => {

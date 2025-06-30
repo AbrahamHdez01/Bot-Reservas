@@ -107,8 +107,8 @@ get-refresh-token.js
 oauth-tokens.json
 credentials.json
 
-# Database migration script
-migrate-database.js
+# Vercel
+.vercel
 
-# Render specific
-.render-buildlogs/ 
+# Platform specific
+render.yaml 
