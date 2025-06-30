@@ -74,9 +74,81 @@ function initDatabase() {
     // Poblar desde metro_stations.json
     let metroStations = {};
     try {
-      const metroStationsData = fs.readFileSync(path.join(__dirname, 'metro_stations.json'), 'utf8');
-      metroStations = JSON.parse(metroStationsData);
-      console.log('✅ Estaciones del Metro CDMX cargadas correctamente desde JSON');
+      // En lugar de leer archivo, usar datos hardcodeados para serverless
+      metroStations = {
+        "1": [
+          {"name": "Observatorio, Ciudad de México, CDMX, México", "available": false, "reason": "Mantenimiento"},
+          {"name": "Tacubaya, Ciudad de México, CDMX, México", "available": false, "reason": "Mantenimiento"},
+          {"name": "Juanacatlán, Ciudad de México, CDMX, México", "available": false, "reason": "Mantenimiento"},
+          {"name": "Chapultepec, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Sevilla, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Insurgentes, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Cuauhtémoc, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Balderas, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Salto del Agua, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Isabel la Católica, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Pino Suárez, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Merced, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Candelaria, Ciudad de México, CDMX, México", "available": true},
+          {"name": "San Lázaro, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Moctezuma, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Balbuena, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Boulevard Puerto Aéreo, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Gómez Farías, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Zaragoza, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Pantitlán, Ciudad de México, CDMX, México", "available": true}
+        ],
+        "2": [
+          {"name": "Cuatro Caminos, Naucalpan de Juárez, Méx., México", "available": true},
+          {"name": "Panteones, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Tacuba, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Cuitláhuac, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Popotla, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Colegio Militar, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Normal, Ciudad de México, CDMX, México", "available": true},
+          {"name": "San Cosme, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Revolución, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Hidalgo, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Bellas Artes, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Allende, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Zócalo/Tenochtitlan, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Pino Suárez, Ciudad de México, CDMX, México", "available": true},
+          {"name": "San Antonio Abad, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Chabacano, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Viaducto, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Xola, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Villa de Cortés, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Nativitas, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Portales, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Ermita, Ciudad de México, CDMX, México", "available": true},
+          {"name": "General Anaya, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Tasqueña, Ciudad de México, CDMX, México", "available": true}
+        ],
+        "3": [
+          {"name": "Indios Verdes, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Deportivo 18 de Marzo, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Potrero, Ciudad de México, CDMX, México", "available": true},
+          {"name": "La Raza, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Tlatelolco, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Guerrero, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Hidalgo, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Juárez, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Balderas, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Niños Héroes, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Hospital General, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Centro Médico, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Etiopía/Plaza de la Transparencia, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Eugenia, Ciudad de México, CDMX, México", "available": true},
+          {"name": "División del Norte, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Zapata, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Coyoacán, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Viveros/Derechos Humanos, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Miguel Ángel de Quevedo, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Copilco, Ciudad de México, CDMX, México", "available": true},
+          {"name": "Universidad, Ciudad de México, CDMX, México", "available": true}
+        ]
+      };
+      console.log('✅ Estaciones del Metro CDMX cargadas correctamente desde datos hardcodeados');
     } catch (error) {
       console.error('❌ Error cargando estaciones del metro:', error.message);
     }
