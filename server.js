@@ -20,7 +20,7 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'client/build')));
+// app.use(express.static(path.join(__dirname, 'client/build'))); // <-- ELIMINADO O COMENTADO
 
 // Rate limiting
 const limiter = rateLimit({
@@ -30,7 +30,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Database setup
-const db = new sqlite3.Database(':memory:', (err) => {
+6 = new sqlite3.Database(':memory:', (err) => {12
   if (err) {
     console.error('Error opening database:', err);
   } else {
@@ -1160,18 +1160,18 @@ app.delete('/api/bookings/:id', adminAuth, async (req, res) => {
 });
 
 // === Página de Política de Privacidad ===
-app.get('/privacy', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'privacy.html'));
-});
+// app.get('/privacy', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'client/build', 'privacy.html'));
+// });
 
 // Serve React app
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
+// app.get('/admin', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+// });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
+// app.get('*', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+// });
 
 // Endpoint para monitorear uso de APIs (solo para admin)
 app.get('/api/admin/api-usage', adminAuth, (req, res) => {
