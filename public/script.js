@@ -251,11 +251,19 @@ function llenarHorasDisponibles() {
     
     if (!fechaInput.value || !estacionSelect.value) return;
 
+    // Validar que sea lunes, martes o miércoles
+    const fecha = new Date(fechaInput.value);
+    const diaSemana = fecha.getDay(); // 0 = domingo, 1 = lunes, 2 = martes, 3 = miércoles
+    if (diaSemana < 1 || diaSemana > 3) {
+        horaSelect.innerHTML = '<option value="">Solo se permiten reservas de lunes a miércoles</option>';
+        return;
+    }
+
     const estacion = estacionSelect.value.toLowerCase();
     let horaInicio = 10; // Por defecto 10 am
     let horaFin = 17; // 5 pm
     
-    // Ajustar hora de inicio según estación
+    // Ajustar hora de inicio según estación específica
     if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
         // Línea 8: Constitución a Santa Anita (desde 8:30 am)
         horaInicio = 8.5; // 8:30 am
@@ -324,13 +332,20 @@ async function crearReserva() {
         return;
     }
 
+    // Validar que sea lunes, martes o miércoles
+    const diaSemana = fechaSeleccionada.getDay();
+    if (diaSemana < 1 || diaSemana > 3) {
+        mostrarError('Solo se permiten reservas de lunes a miércoles');
+        return;
+    }
+
     // Validar horario según estación
     const estacion = datos.estacion.toLowerCase();
     const horaSeleccionada = datos.hora;
     let horaInicio = 10;
     let horaFin = 17;
     
-    // Ajustar hora de inicio según estación
+    // Ajustar hora de inicio según estación específica
     if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
         horaInicio = 8.5;
     } else if (["periférico oriente", "atlalilco"].some(n => estacion.includes(n))) {
