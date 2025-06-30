@@ -1,5 +1,18 @@
 import { google } from 'googleapis';
 
+function to24Hour(hora) {
+  // Si ya es formato 24h, regresa igual
+  if (/^\d{2}:\d{2}$/.test(hora)) return hora;
+  // Si es formato 12h con AM/PM
+  const match = hora.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return hora;
+  let [_, h, m, ampm] = match;
+  h = parseInt(h, 10);
+  if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+  if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+  return `${h.toString().padStart(2, '0')}:${m}`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -65,8 +78,10 @@ export default async function handler(req, res) {
 
     console.log('📅 Preparando evento...');
 
+    // Convertir hora a formato 24h
+    const hora24 = to24Hour(hora);
     // Crear evento
-    const startTime = new Date(`${fecha}T${hora}:00`);
+    const startTime = new Date(`${fecha}T${hora24}:00`);
     const endTime = new Date(startTime.getTime() + (30 * 60 * 1000)); // 30 minutos de duración
 
     const event = {

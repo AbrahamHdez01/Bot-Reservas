@@ -295,6 +295,18 @@ function formatearHora(hora) {
     return `${horas12}:${minutos.toString().padStart(2, '0')} ${ampm}`;
 }
 
+// Convierte hora de 12h a 24h
+function to24Hour(hora) {
+  if (/^\d{2}:\d{2}$/.test(hora)) return hora;
+  const match = hora.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return hora;
+  let [_, h, m, ampm] = match;
+  h = parseInt(h, 10);
+  if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+  if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+  return `${h.toString().padStart(2, '0')}:${m}`;
+}
+
 // Crear reserva
 async function crearReserva() {
     if (carrito.length === 0) {
@@ -308,7 +320,7 @@ async function crearReserva() {
         telefono: formData.get('telefono'),
         estacion: formData.get('estacion'),
         fecha: formData.get('fecha'),
-        hora: formData.get('hora'),
+        hora: to24Hour(formData.get('hora')),
         productos: carrito
     };
 
