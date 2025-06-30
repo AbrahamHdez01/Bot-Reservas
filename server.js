@@ -508,8 +508,82 @@ app.get('/api/products/:category', (req, res) => {
   res.json(products);
 });
 
-// Get available time slots for a date
-app.get('/api/available-slots/:date', (req, res) => {
+// Get available time slots for a date and station
+app.get('/api/available-slots/:date/:station?', async (req, res) => {
+  const { date, station } = req.params;
+  
+  // Bloquear fechas pasadas Y fines de semana (sábado=6, domingo=0)
+  const dayOfWeek = moment.tz(date, 'YYYY-MM-DD', 'America/Mexico_City').day();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return res.json([]); // No hay horarios disponibles en fin de semana
+  }
+
+  // Generate time slots from 10 AM to 6 PM (18:00)
+  const slots = [];
+  for (let hour = 10; hour <= 17; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      slots.push(time);
+    }
+  }
+
+  try {
+    // Get existing bookings for this date
+    const existingBookings = await new Promise((resolve, reject) => {
+      db.all('SELECT delivery_time, metro_station FROM bookings WHERE delivery_date = ?', [date], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    // Si no se especifica estación, usar validación básica
+    if (!station) {
+      const bookedTimes = existingBookings.map(row => row.delivery_time);
+      const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
+      return res.json(availableSlots);
+    }
+
+    // Validación inteligente por estación
+    const availableSlots = [];
+    
+    for (const slot of slots) {
+      const newBooking = {
+        delivery_date: date,
+        delivery_time: slot,
+        metro_station: decodeURIComponent(station)
+      };
+
+      // Validar si este horario es posible
+      const validation = await validateBookingSchedule(newBooking, existingBookings);
+      
+      if (validation.valid) {
+        availableSlots.push(slot);
+      } else {
+        console.log(`⏰ Horario ${slot} no disponible para ${station}: ${validation.reason}`);
+      }
+    }
+
+    res.json(availableSlots);
+
+  } catch (error) {
+    console.error('Error getting available slots:', error);
+    // Fallback: devolver slots básicos sin validación inteligente
+    const existingBookings = await new Promise((resolve, reject) => {
+      db.all('SELECT delivery_time FROM bookings WHERE delivery_date = ?', [date], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    const bookedTimes = existingBookings.map(row => row.delivery_time);
+    const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
+    
+    res.json(availableSlots);
+  }
+});
+
+// Mantener endpoint legacy para compatibilidad
+app.get('/api/available-slots/:date', async (req, res) => {
   const { date } = req.params;
   
   // Bloquear fechas pasadas Y fines de semana (sábado=6, domingo=0)
@@ -541,6 +615,148 @@ app.get('/api/available-slots/:date', (req, res) => {
   });
 });
 
+// Función para validar si es posible hacer una reserva considerando los tiempos de traslado en metro
+async function validateBookingSchedule(newBooking, existingBookings) {
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    console.log('⚠️ Google Maps API no configurada, usando validación básica de tiempo');
+    // Fallback: validación básica de 20 minutos entre reservas
+    const requestedTime = moment.tz(`${newBooking.delivery_date} ${newBooking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    
+    for (const booking of existingBookings) {
+      const bookingTime = moment.tz(`${newBooking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const timeDiff = Math.abs(requestedTime.diff(bookingTime, 'minutes'));
+      
+      if (timeDiff < 20) {
+        return {
+          valid: false,
+          reason: 'Debe haber al menos 20 minutos entre entregas. Horario no disponible.'
+        };
+      }
+    }
+    return { valid: true };
+  }
+
+  try {
+    // Ordenar todas las reservas del día por hora (incluyendo la nueva)
+    const allBookings = [...existingBookings, newBooking].sort((a, b) => {
+      const timeA = moment.tz(`${newBooking.delivery_date} ${a.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const timeB = moment.tz(`${newBooking.delivery_date} ${b.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      return timeA.diff(timeB);
+    });
+
+    // Encontrar la posición de la nueva reserva
+    const newBookingIndex = allBookings.findIndex(booking => 
+      booking.delivery_time === newBooking.delivery_time && 
+      booking.metro_station === newBooking.metro_station
+    );
+
+    // Validar tiempos de traslado hacia la reserva anterior y siguiente
+    const validations = [];
+
+    // Validar tiempo desde la reserva anterior
+    if (newBookingIndex > 0) {
+      const previousBooking = allBookings[newBookingIndex - 1];
+      validations.push({
+        from: previousBooking,
+        to: newBooking,
+        direction: 'from_previous'
+      });
+    }
+
+    // Validar tiempo hacia la reserva siguiente
+    if (newBookingIndex < allBookings.length - 1) {
+      const nextBooking = allBookings[newBookingIndex + 1];
+      validations.push({
+        from: newBooking,
+        to: nextBooking,
+        direction: 'to_next'
+      });
+    }
+
+    // Realizar validaciones de tiempo de traslado
+    for (const validation of validations) {
+      const { from, to, direction } = validation;
+
+      // Si es la misma estación, solo necesitamos 10 minutos de separación
+      if (from.metro_station === to.metro_station) {
+        const fromTime = moment.tz(`${newBooking.delivery_date} ${from.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+        const toTime = moment.tz(`${newBooking.delivery_date} ${to.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+        const timeDiff = toTime.diff(fromTime, 'minutes');
+
+        if (timeDiff < 10) {
+          return {
+            valid: false,
+            reason: `Se necesitan al menos 10 minutos entre entregas en la misma estación (${from.metro_station}).`
+          };
+        }
+        continue;
+      }
+
+      // Calcular tiempo de traslado usando Google Maps
+      console.log(`🗺️ Calculando tiempo de traslado: ${from.metro_station} → ${to.metro_station}`);
+      
+      const transitInfo = await getTransitTime(from.metro_station, to.metro_station);
+      
+      if (!transitInfo) {
+        console.log(`⚠️ No se pudo calcular ruta entre ${from.metro_station} y ${to.metro_station}, usando tiempo estimado`);
+        // Fallback: asumir 30 minutos si no hay información
+        const estimatedMinutes = 30;
+        const fromTime = moment.tz(`${newBooking.delivery_date} ${from.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+        const toTime = moment.tz(`${newBooking.delivery_date} ${to.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+        const availableTime = toTime.diff(fromTime, 'minutes');
+
+        if (availableTime < estimatedMinutes + 10) { // +10 minutos de buffer
+          return {
+            valid: false,
+            reason: `Tiempo insuficiente para trasladarse de ${from.metro_station} a ${to.metro_station}. Se necesitan aproximadamente ${estimatedMinutes + 10} minutos, pero solo hay ${availableTime} minutos disponibles.`
+          };
+        }
+        continue;
+      }
+
+      // Calcular tiempo disponible entre las dos reservas
+      const fromTime = moment.tz(`${newBooking.delivery_date} ${from.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const toTime = moment.tz(`${newBooking.delivery_date} ${to.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const availableMinutes = toTime.diff(fromTime, 'minutes');
+
+      // Tiempo necesario = tiempo de traslado + 10 minutos de entrega + 5 minutos de buffer
+      const requiredMinutes = Math.ceil(transitInfo.duration / 60) + 15; // 10 entrega + 5 buffer
+
+      console.log(`⏱️ Tiempo disponible: ${availableMinutes} min, Tiempo requerido: ${requiredMinutes} min (${transitInfo.durationText} + 15 min buffer)`);
+
+      if (availableMinutes < requiredMinutes) {
+        const stationFrom = from.metro_station.replace(', Ciudad de México, CDMX, México', '').replace(', Estado de México, México', '');
+        const stationTo = to.metro_station.replace(', Ciudad de México, CDMX, México', '').replace(', Estado de México, México', '');
+        
+        return {
+          valid: false,
+          reason: `Tiempo insuficiente para trasladarse de ${stationFrom} a ${stationTo}. Se necesitan ${requiredMinutes} minutos (${transitInfo.durationText} en metro + buffer), pero solo hay ${availableMinutes} minutos disponibles.`
+        };
+      }
+    }
+
+    return { valid: true };
+
+  } catch (error) {
+    console.error('Error validando horario:', error);
+    // En caso de error, usar validación básica
+    const requestedTime = moment.tz(`${newBooking.delivery_date} ${newBooking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    
+    for (const booking of existingBookings) {
+      const bookingTime = moment.tz(`${newBooking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const timeDiff = Math.abs(requestedTime.diff(bookingTime, 'minutes'));
+      
+      if (timeDiff < 30) {
+        return {
+          valid: false,
+          reason: 'Error al validar rutas. Se requieren al menos 30 minutos entre entregas por seguridad.'
+        };
+      }
+    }
+    return { valid: true };
+  }
+}
+
 // Create a new booking
 app.post('/api/bookings', async (req, res) => {
   const {
@@ -570,26 +786,33 @@ app.post('/api/bookings', async (req, res) => {
       });
     }
 
-    // Validate minimum time between bookings (20 minutes)
+    // Validar disponibilidad y tiempos de traslado usando Google Maps Directions API
     const existingBookings = await new Promise((resolve, reject) => {
-      db.all('SELECT delivery_time FROM bookings WHERE delivery_date = ?', [delivery_date], (err, rows) => {
+      db.all('SELECT delivery_time, metro_station FROM bookings WHERE delivery_date = ?', [delivery_date], (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
     });
 
-    const requestedTime = moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    // Crear objeto de la nueva reserva para validación
+    const newBooking = {
+      delivery_date,
+      delivery_time,
+      metro_station
+    };
+
+    // Validar si es posible hacer la reserva considerando tiempos de traslado en metro
+    console.log(`🚇 Validando reserva para ${metro_station} a las ${delivery_time}...`);
+    const validation = await validateBookingSchedule(newBooking, existingBookings);
     
-    for (const booking of existingBookings) {
-      const bookingTime = moment.tz(`${delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
-      const timeDiff = Math.abs(requestedTime.diff(bookingTime, 'minutes'));
-      
-      if (timeDiff < 20) {
-        return res.status(400).json({
-          error: 'Debe haber al menos 20 minutos entre entregas. Horario no disponible.'
-        });
-      }
+    if (!validation.valid) {
+      console.log(`❌ Reserva rechazada: ${validation.reason}`);
+      return res.status(400).json({
+        error: validation.reason
+      });
     }
+    
+    console.log(`✅ Reserva validada exitosamente para ${metro_station} a las ${delivery_time}`);
 
     // Validar número telefónico de 10 dígitos
     const phoneDigits = (customer_phone || '').replace(/\D/g, ''); // quitar espacios, guiones, etc.

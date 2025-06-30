@@ -88,7 +88,16 @@ function App() {
     if (selectedDate) {
       const fetchSlots = async () => {
         const dateStr = selectedDate.toISOString().split('T')[0];
-        const slots = await getAvailableSlots(dateStr);
+        let slots;
+        
+        // Si hay estación seleccionada, usar validación inteligente
+        if (selectedStation) {
+          console.log(`🔍 Obteniendo horarios disponibles para ${selectedStation.name} el ${dateStr}...`);
+          slots = await getAvailableSlots(dateStr, selectedStation.name);
+        } else {
+          // Si no hay estación, usar validación básica
+          slots = await getAvailableSlots(dateStr);
+        }
         
         // Filtrar horarios que ya pasaron si es hoy
         const now = new Date();
@@ -105,15 +114,26 @@ function App() {
         }
         
         setAvailableSlots(availableSlots);
+        
+        if (selectedStation && availableSlots.length < slots.length) {
+          const blockedSlots = slots.length - availableSlots.length;
+          console.log(`⚠️ ${blockedSlots} horarios bloqueados por tiempos de traslado en metro`);
+        }
       };
       
       fetchSlots();
     }
-  }, [selectedDate]);
+  }, [selectedDate, selectedStation]);
 
-  const getAvailableSlots = async (date) => {
+  const getAvailableSlots = async (date, station = null) => {
     try {
-      const response = await fetch(`/api/available-slots/${date}`);
+      let url = `/api/available-slots/${date}`;
+      if (station) {
+        // Codificar la estación para la URL
+        url += `/${encodeURIComponent(station)}`;
+      }
+      
+      const response = await fetch(url);
       if (response.ok) {
         const slots = await response.json();
         return slots;
