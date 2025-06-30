@@ -1,0 +1,22 @@
+{
+  "name": "reservas-metro-cdmx",
+  "version": "1.0.0",
+  "description": "Sistema de reservas para entregas en Metro CDMX",
+  "type": "module",
+  "main": "index.html",
+  "scripts": {
+    "dev": "node scripts/init-data.js && vercel dev",
+    "build": "node scripts/init-data.js && echo 'Static site - no build needed'",
+    "deploy": "vercel --prod",
+    "init-data": "node scripts/init-data.js"
+  },
+  "dependencies": {
+    "googleapis": "^128.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 

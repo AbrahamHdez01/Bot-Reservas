@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; max-width: 600px; margin: 2em auto; background: #f9f9f9; }
+form { background: #fff; padding: 2em; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+label, legend { font-weight: bold; }
+fieldset { margin-bottom: 1em; }
+#resultado { margin-top: 2em; } 

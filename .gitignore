@@ -17,6 +17,10 @@ yarn-error.log*
 database.sqlite
 database.sqlite3
 
+# Data files (but keep reservas.json)
+data/*
+!data/reservas.json
+
 # Build files
 client/build/
 client/dist/

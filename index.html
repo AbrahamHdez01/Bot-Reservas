@@ -1,1 +1,30 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"/><link rel="icon" href="/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#667eea"/><meta name="description" content="Sistema de reservas para entregas en Metro CDMX con optimización de rutas"/><link rel="apple-touch-icon" href="/logo192.png"/><link rel="manifest" href="/manifest.json"/><title>Metro CDMX Delivery - Sistema de Reservas</title><script defer="defer" src="/static/js/main.a6a4738c.js"></script><link href="/static/css/main.4edb964c.css" rel="stylesheet"></head><body><noscript>Necesitas habilitar JavaScript para usar esta aplicación.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reserva de Entregas Metro CDMX</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Reserva tu entrega en el Metro CDMX</h1>
+  <form id="reserva-form">
+    <label>Nombre: <input type="text" id="nombre" required></label><br>
+    <label>Teléfono: <input type="tel" id="telefono" pattern="[0-9]{10}" maxlength="10" placeholder="10 dígitos" required></label><br>
+    <label>Estación:
+      <select id="estacion" required></select>
+    </label><br>
+    <label>Fecha: <input type="date" id="fecha" required></label><br>
+    <label>Hora: <input type="time" id="hora" required></label><br>
+    <fieldset>
+      <legend>Productos</legend>
+      <div id="productos"></div>
+    </fieldset>
+    <button type="submit">Reservar entrega</button>
+  </form>
+  <div style="margin-top: 2em; text-align: center;">
+    <a href="/admin" style="color: #667eea; text-decoration: none;">Panel de Administración</a>
+  </div>
+  <div id="resultado"></div>
+  <script src="script.js"></script>
+</body>
+</html>
