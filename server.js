@@ -59,7 +59,8 @@ function initDatabase() {
     // Crear índice único para evitar duplicados al sincronizar con Google Calendar
     db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_calendar_event_id ON bookings(google_calendar_event_id)`);
 
-    // Metro stations table
+    // Metro stations table (DROP and recreate for serverless)
+    db.run('DROP TABLE IF EXISTS metro_stations');
     db.run(`CREATE TABLE IF NOT EXISTS metro_stations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -91,7 +92,6 @@ function initDatabase() {
       { name: 'Gómez Farías', line: '1', lat: 19.4825, lng: -99.0125 },
       { name: 'Zaragoza', line: '1', lat: 19.4875, lng: -99.0000 },
       { name: 'Pantitlán', line: '1', lat: 19.4925, lng: -98.9875 },
-      
       // Línea 2
       { name: 'Cuatro Caminos', line: '2', lat: 19.4975, lng: -99.2008 },
       { name: 'Panteones', line: '2', lat: 19.5025, lng: -99.1875 },
@@ -119,7 +119,7 @@ function initDatabase() {
       { name: 'Tasqueña', line: '2', lat: 19.6075, lng: -98.9250 }
     ];
 
-    const insertStation = db.prepare('INSERT OR IGNORE INTO metro_stations (name, line, latitude, longitude) VALUES (?, ?, ?, ?)');
+    const insertStation = db.prepare('INSERT INTO metro_stations (name, line, latitude, longitude) VALUES (?, ?, ?, ?)');
     stations.forEach(station => {
       insertStation.run(station.name, station.line, station.lat, station.lng);
     });
