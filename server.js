@@ -30,7 +30,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Database setup
-6 = new sqlite3.Database(':memory:', (err) => {12
+63 = new sqlite3.Database(':memory:', (err) => {12
   if (err) {
     console.error('Error opening database:', err);
   } else {

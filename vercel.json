@@ -17,10 +17,6 @@
     {
       "src": "/api/(.*)",
       "dest": "/server.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/client/index.html"
     }
   ]
 } 
