@@ -66,62 +66,33 @@ function initDatabase() {
       name TEXT NOT NULL,
       line TEXT NOT NULL,
       latitude REAL,
-      longitude REAL
+      longitude REAL,
+      available INTEGER DEFAULT 1,
+      reason TEXT
     )`);
 
-    // Insert default Metro CDMX stations
-    const stations = [
-      // Línea 1
-      { name: 'Observatorio', line: '1', lat: 19.3975, lng: -99.2008 },
-      { name: 'Tacubaya', line: '1', lat: 19.4025, lng: -99.1875 },
-      { name: 'Juanacatlán', line: '1', lat: 19.4075, lng: -99.1750 },
-      { name: 'Chapultepec', line: '1', lat: 19.4125, lng: -99.1875 },
-      { name: 'Sevilla', line: '1', lat: 19.4175, lng: -99.1750 },
-      { name: 'Insurgentes Sur', line: '1', lat: 19.4225, lng: -99.1625 },
-      { name: 'Cuauhtémoc', line: '1', lat: 19.4275, lng: -99.1500 },
-      { name: 'Balderas', line: '1', lat: 19.4325, lng: -99.1375 },
-      { name: 'Salto del Agua', line: '1', lat: 19.4375, lng: -99.1250 },
-      { name: 'Isabel la Católica', line: '1', lat: 19.4425, lng: -99.1125 },
-      { name: 'Pino Suárez', line: '1', lat: 19.4475, lng: -99.1000 },
-      { name: 'Merced', line: '1', lat: 19.4525, lng: -99.0875 },
-      { name: 'Candelaria', line: '1', lat: 19.4575, lng: -99.0750 },
-      { name: 'San Lázaro', line: '1', lat: 19.4625, lng: -99.0625 },
-      { name: 'Moctezuma', line: '1', lat: 19.4675, lng: -99.0500 },
-      { name: 'Balbuena', line: '1', lat: 19.4725, lng: -99.0375 },
-      { name: 'Boulevard Puerto Aéreo', line: '1', lat: 19.4775, lng: -99.0250 },
-      { name: 'Gómez Farías', line: '1', lat: 19.4825, lng: -99.0125 },
-      { name: 'Zaragoza', line: '1', lat: 19.4875, lng: -99.0000 },
-      { name: 'Pantitlán', line: '1', lat: 19.4925, lng: -98.9875 },
-      // Línea 2
-      { name: 'Cuatro Caminos', line: '2', lat: 19.4975, lng: -99.2008 },
-      { name: 'Panteones', line: '2', lat: 19.5025, lng: -99.1875 },
-      { name: 'Tacuba', line: '2', lat: 19.5075, lng: -99.1750 },
-      { name: 'Cuitláhuac', line: '2', lat: 19.5125, lng: -99.1625 },
-      { name: 'Popotla', line: '2', lat: 19.5175, lng: -99.1500 },
-      { name: 'Colegio Militar', line: '2', lat: 19.5225, lng: -99.1375 },
-      { name: 'Normal', line: '2', lat: 19.5275, lng: -99.1250 },
-      { name: 'San Cosme', line: '2', lat: 19.5325, lng: -99.1125 },
-      { name: 'Revolución', line: '2', lat: 19.5375, lng: -99.1000 },
-      { name: 'Hidalgo', line: '2', lat: 19.5425, lng: -99.0875 },
-      { name: 'Bellas Artes', line: '2', lat: 19.5475, lng: -99.0750 },
-      { name: 'Allende', line: '2', lat: 19.5525, lng: -99.0625 },
-      { name: 'Zócalo', line: '2', lat: 19.5575, lng: -99.0500 },
-      { name: 'Pino Suárez', line: '2', lat: 19.4475, lng: -99.1000 },
-      { name: 'San Antonio Abad', line: '2', lat: 19.5625, lng: -99.0375 },
-      { name: 'Chabacano', line: '2', lat: 19.5675, lng: -99.0250 },
-      { name: 'Viaducto', line: '2', lat: 19.5725, lng: -99.0125 },
-      { name: 'Xola', line: '2', lat: 19.5775, lng: -99.0000 },
-      { name: 'Villa de Cortés', line: '2', lat: 19.5825, lng: -98.9875 },
-      { name: 'Nativitas', line: '2', lat: 19.5875, lng: -98.9750 },
-      { name: 'Portales', line: '2', lat: 19.5925, lng: -98.9625 },
-      { name: 'Ermita', line: '2', lat: 19.5975, lng: -98.9500 },
-      { name: 'General Anaya', line: '2', lat: 19.6025, lng: -98.9375 },
-      { name: 'Tasqueña', line: '2', lat: 19.6075, lng: -98.9250 }
-    ];
+    // Poblar desde metro_stations.json
+    let metroStations = {};
+    try {
+      const metroStationsData = fs.readFileSync(path.join(__dirname, 'metro_stations.json'), 'utf8');
+      metroStations = JSON.parse(metroStationsData);
+      console.log('✅ Estaciones del Metro CDMX cargadas correctamente desde JSON');
+    } catch (error) {
+      console.error('❌ Error cargando estaciones del metro:', error.message);
+    }
 
-    const insertStation = db.prepare('INSERT INTO metro_stations (name, line, latitude, longitude) VALUES (?, ?, ?, ?)');
-    stations.forEach(station => {
-      insertStation.run(station.name, station.line, station.lat, station.lng);
+    const insertStation = db.prepare('INSERT INTO metro_stations (name, line, latitude, longitude, available, reason) VALUES (?, ?, ?, ?, ?, ?)');
+    Object.entries(metroStations).forEach(([line, stations]) => {
+      stations.forEach(station => {
+        insertStation.run(
+          station.name,
+          line,
+          station.latitude || null,
+          station.longitude || null,
+          station.available === false ? 0 : 1,
+          station.reason || null
+        );
+      });
     });
     insertStation.finalize();
   });
