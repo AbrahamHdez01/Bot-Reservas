@@ -10,6 +10,8 @@ function leerReservas() {
       const data = fs.readFileSync(dataPath, 'utf8');
       return JSON.parse(data);
     }
+    // Si no existe, crear el archivo
+    escribirReservas([]);
     return [];
   } catch (error) {
     console.error('Error leyendo reservas:', error);
