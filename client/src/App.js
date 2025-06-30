@@ -87,7 +87,9 @@ function App() {
   useEffect(() => {
     if (selectedDate) {
       const fetchSlots = async () => {
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        const dateStr = selectedDate.getFullYear() + '-' + 
+                       String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                       String(selectedDate.getDate()).padStart(2, '0');
         let slots;
         
         // Si hay estación seleccionada, usar validación inteligente
@@ -169,7 +171,9 @@ function App() {
           customer_phone: formData.customer_phone,
           products: Object.values(cart).map(item => `${item.nombre} x${item.cantidad} (${item.categoria})`).join(', '),
           metro_station: selectedStation.name,
-          delivery_date: selectedDate.toISOString().split('T')[0],
+          delivery_date: selectedDate.getFullYear() + '-' + 
+                         String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                         String(selectedDate.getDate()).padStart(2, '0'),
           delivery_time: selectedSlot
         }),
       });
@@ -200,11 +204,17 @@ function App() {
     }
   };
 
-  // Generate time slots from 10 AM to 6 PM
+  // Generate time slots from 10 AM to 5:00 PM
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 10; hour <= 17; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+    const startHour = 10;
+    const endHour = 17;
+    const endMinute = 0;
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      const maxMinute = (hour === endHour) ? endMinute : 55;
+      
+      for (let minute = 0; minute <= maxMinute; minute += 5) {
         const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         slots.push(time);
       }

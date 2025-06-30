@@ -348,7 +348,21 @@ async function getTransitTime(origin, destination) {
     };
   }
 
+  // Verificar límites antes de hacer la llamada
+  if (!checkMapsAPILimits()) {
+    console.log('🚫 Límite diario de Google Maps API alcanzado, usando valores estimados');
+    return {
+      duration: 1800, // 30 minutos en segundos
+      durationText: '30 min (estimado - límite alcanzado)',
+      distance: 5000, // 5 km en metros
+      distanceText: '5.0 km (estimado)'
+    };
+  }
+
   try {
+    // Incrementar contador antes de hacer la llamada
+    incrementMapsAPIUsage();
+    
     const response = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
       params: {
         origin: origin,
@@ -362,6 +376,9 @@ async function getTransitTime(origin, destination) {
     if (response.data.routes && response.data.routes.length > 0) {
       const route = response.data.routes[0];
       const leg = route.legs[0];
+      
+      console.log(`✅ Google Maps: ${origin.replace(', Ciudad de México, CDMX, México', '')} → ${destination.replace(', Ciudad de México, CDMX, México', '')} = ${leg.duration.text}`);
+      
       return {
         duration: leg.duration.value, // seconds
         durationText: leg.duration.text,
@@ -372,12 +389,18 @@ async function getTransitTime(origin, destination) {
     return null;
   } catch (error) {
     console.error('Error getting transit time:', error);
+    
+    // Si hay error, no decrementar el contador (ya se usó el request)
+    if (error.response && error.response.status === 429) {
+      console.log('⚠️ Rate limit alcanzado en Google Maps API');
+    }
+    
     // En caso de error, devolver valores simulados
     return {
       duration: 1800, // 30 minutos en segundos
-      durationText: '30 min',
+      durationText: '30 min (estimado - error)',
       distance: 5000, // 5 km en metros
-      distanceText: '5.0 km'
+      distanceText: '5.0 km (estimado)'
     };
   }
 }
@@ -518,15 +541,6 @@ app.get('/api/available-slots/:date/:station?', async (req, res) => {
     return res.json([]); // No hay horarios disponibles en fin de semana
   }
 
-  // Generate time slots from 10 AM to 6 PM (18:00)
-  const slots = [];
-  for (let hour = 10; hour <= 17; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-      slots.push(time);
-    }
-  }
-
   try {
     // Get existing bookings for this date
     const existingBookings = await new Promise((resolve, reject) => {
@@ -536,48 +550,22 @@ app.get('/api/available-slots/:date/:station?', async (req, res) => {
       });
     });
 
-    // Si no se especifica estación, usar validación básica
+    // Si no se especifica estación, generar horarios dinámicos básicos
     if (!station) {
-      const bookedTimes = existingBookings.map(row => row.delivery_time);
-      const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
+      const availableSlots = await generateDynamicTimeSlots(date, existingBookings);
       return res.json(availableSlots);
     }
 
-    // Validación inteligente por estación
-    const availableSlots = [];
-    
-    for (const slot of slots) {
-      const newBooking = {
-        delivery_date: date,
-        delivery_time: slot,
-        metro_station: decodeURIComponent(station)
-      };
-
-      // Validar si este horario es posible
-      const validation = await validateBookingSchedule(newBooking, existingBookings);
-      
-      if (validation.valid) {
-        availableSlots.push(slot);
-      } else {
-        console.log(`⏰ Horario ${slot} no disponible para ${station}: ${validation.reason}`);
-      }
-    }
+    // Validación inteligente por estación con horarios dinámicos
+    const stationName = decodeURIComponent(station);
+    const availableSlots = await generateDynamicTimeSlotsForStation(date, stationName, existingBookings);
 
     res.json(availableSlots);
 
   } catch (error) {
     console.error('Error getting available slots:', error);
-    // Fallback: devolver slots básicos sin validación inteligente
-    const existingBookings = await new Promise((resolve, reject) => {
-      db.all('SELECT delivery_time FROM bookings WHERE delivery_date = ?', [date], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
-
-    const bookedTimes = existingBookings.map(row => row.delivery_time);
-    const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
-    
+    // Fallback: devolver slots básicos
+    const availableSlots = await generateDynamicTimeSlots(date, []);
     res.json(availableSlots);
   }
 });
@@ -592,28 +580,149 @@ app.get('/api/available-slots/:date', async (req, res) => {
     return res.json([]); // No hay horarios disponibles en fin de semana
   }
 
-  // Generate time slots from 10 AM to 6 PM (18:00)
+  try {
+    // Get existing bookings for this date
+    const existingBookings = await new Promise((resolve, reject) => {
+      db.all('SELECT delivery_time, metro_station FROM bookings WHERE delivery_date = ?', [date], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    const availableSlots = await generateDynamicTimeSlots(date, existingBookings);
+    res.json(availableSlots);
+
+  } catch (error) {
+    console.error('Error getting available slots:', error);
+    const availableSlots = await generateDynamicTimeSlots(date, []);
+    res.json(availableSlots);
+  }
+});
+
+// Función para generar horarios dinámicos básicos (sin estación específica)
+async function generateDynamicTimeSlots(date, existingBookings) {
   const slots = [];
-  for (let hour = 10; hour <= 17; hour++) { // Cambiar a <= 17 para incluir hasta 17:30
-    for (let minute = 0; minute < 60; minute += 30) {
+  
+  // Horario de 10:00 AM a 5:00 PM
+  const startHour = 10;
+  const endHour = 17;
+  const endMinute = 0;
+  
+  // Generar slots cada 5 minutos
+  for (let hour = startHour; hour <= endHour; hour++) {
+    const maxMinute = (hour === endHour) ? endMinute : 55;
+    
+    for (let minute = 0; minute <= maxMinute; minute += 5) {
       const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       slots.push(time);
     }
   }
 
-  // Check existing bookings for this date
-  db.all('SELECT delivery_time FROM bookings WHERE delivery_date = ?', [date], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-
-    const bookedTimes = rows.map(row => row.delivery_time);
-    const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
+  // Filtrar slots que tienen conflictos básicos (separación mínima de 5 minutos)
+  const availableSlots = [];
+  
+  for (const slot of slots) {
+    const slotMoment = moment.tz(`${date} ${slot}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+    let isAvailable = true;
     
-    res.json(availableSlots);
-  });
-});
+    // Verificar separación mínima con otras reservas
+    for (const booking of existingBookings) {
+      const bookingMoment = moment.tz(`${date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+      const timeDiff = Math.abs(slotMoment.diff(bookingMoment, 'minutes'));
+      
+      if (timeDiff < 5) {
+        isAvailable = false;
+        break;
+      }
+    }
+    
+    if (isAvailable) {
+      availableSlots.push(slot);
+    }
+  }
+  
+  return availableSlots;
+}
+
+// Función para generar horarios dinámicos para una estación específica
+async function generateDynamicTimeSlotsForStation(date, stationName, existingBookings) {
+  const slots = [];
+  
+  // Horario de 10:00 AM a 5:00 PM
+  const startHour = 10;
+  const endHour = 17;
+  const endMinute = 0;
+  
+  // Generar slots cada 5 minutos
+  for (let hour = startHour; hour <= endHour; hour++) {
+    const maxMinute = (hour === endHour) ? endMinute : 55;
+    
+    for (let minute = 0; minute <= maxMinute; minute += 5) {
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      slots.push(time);
+    }
+  }
+
+  const availableSlots = [];
+  
+  for (const slot of slots) {
+    const newBooking = {
+      delivery_date: date,
+      delivery_time: slot,
+      metro_station: stationName
+    };
+
+    // Validar si este horario es posible usando la validación inteligente
+    const validation = await validateBookingSchedule(newBooking, existingBookings);
+    
+    if (validation.valid) {
+      availableSlots.push(slot);
+    }
+  }
+
+  return availableSlots;
+}
+
+// Contador de uso diario de Google Maps API
+let dailyMapsAPIUsage = 0;
+let lastResetDate = new Date().toDateString();
+
+// Límites de seguridad
+const DAILY_MAPS_API_LIMIT = 150; // Límite diario conservador
+const MONTHLY_LIMIT_WARNING = 1000; // Advertencia mensual
+
+// Función para resetear contador diario
+function resetDailyCounterIfNeeded() {
+  const today = new Date().toDateString();
+  if (today !== lastResetDate) {
+    console.log(`🔄 Reseteando contador diario de Google Maps API. Uso anterior: ${dailyMapsAPIUsage} requests`);
+    dailyMapsAPIUsage = 0;
+    lastResetDate = today;
+  }
+}
+
+// Función para verificar límites antes de usar Google Maps API
+function checkMapsAPILimits() {
+  resetDailyCounterIfNeeded();
+  
+  if (dailyMapsAPIUsage >= DAILY_MAPS_API_LIMIT) {
+    console.log(`⚠️ LÍMITE DIARIO ALCANZADO: ${dailyMapsAPIUsage}/${DAILY_MAPS_API_LIMIT} requests`);
+    return false;
+  }
+  
+  return true;
+}
+
+// Función para incrementar contador de uso
+function incrementMapsAPIUsage() {
+  dailyMapsAPIUsage++;
+  console.log(`📊 Google Maps API usage: ${dailyMapsAPIUsage}/${DAILY_MAPS_API_LIMIT} requests hoy`);
+  
+  // Advertencias
+  if (dailyMapsAPIUsage >= DAILY_MAPS_API_LIMIT * 0.8) {
+    console.log(`⚠️ ADVERTENCIA: 80% del límite diario usado (${dailyMapsAPIUsage}/${DAILY_MAPS_API_LIMIT})`);
+  }
+}
 
 // Función para validar si es posible hacer una reserva considerando los tiempos de traslado en metro
 async function validateBookingSchedule(newBooking, existingBookings) {
@@ -626,10 +735,10 @@ async function validateBookingSchedule(newBooking, existingBookings) {
       const bookingTime = moment.tz(`${newBooking.delivery_date} ${booking.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
       const timeDiff = Math.abs(requestedTime.diff(bookingTime, 'minutes'));
       
-      if (timeDiff < 20) {
+      if (timeDiff < 5) {
         return {
           valid: false,
-          reason: 'Debe haber al menos 20 minutos entre entregas. Horario no disponible.'
+          reason: 'Debe haber al menos 5 minutos entre entregas. Horario no disponible.'
         };
       }
     }
@@ -677,16 +786,16 @@ async function validateBookingSchedule(newBooking, existingBookings) {
     for (const validation of validations) {
       const { from, to, direction } = validation;
 
-      // Si es la misma estación, solo necesitamos 10 minutos de separación
+      // Si es la misma estación, solo necesitamos 5 minutos de separación
       if (from.metro_station === to.metro_station) {
         const fromTime = moment.tz(`${newBooking.delivery_date} ${from.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
         const toTime = moment.tz(`${newBooking.delivery_date} ${to.delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
         const timeDiff = toTime.diff(fromTime, 'minutes');
 
-        if (timeDiff < 10) {
+        if (timeDiff < 5) {
           return {
             valid: false,
-            reason: `Se necesitan al menos 10 minutos entre entregas en la misma estación (${from.metro_station}).`
+            reason: `Se necesitan al menos 5 minutos entre entregas en la misma estación (${from.metro_station}).`
           };
         }
         continue;
@@ -1080,6 +1189,37 @@ app.get('/admin', (req, res) => {
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+});
+
+// Endpoint para monitorear uso de APIs (solo para admin)
+app.get('/api/admin/api-usage', adminAuth, (req, res) => {
+  resetDailyCounterIfNeeded();
+  
+  const usageStats = {
+    googleMaps: {
+      dailyUsage: dailyMapsAPIUsage,
+      dailyLimit: DAILY_MAPS_API_LIMIT,
+      percentageUsed: Math.round((dailyMapsAPIUsage / DAILY_MAPS_API_LIMIT) * 100),
+      remainingRequests: DAILY_MAPS_API_LIMIT - dailyMapsAPIUsage,
+      lastReset: lastResetDate,
+      status: dailyMapsAPIUsage >= DAILY_MAPS_API_LIMIT ? 'LIMIT_REACHED' : 
+              dailyMapsAPIUsage >= DAILY_MAPS_API_LIMIT * 0.8 ? 'WARNING' : 'OK'
+    },
+    googleCalendar: {
+      status: 'FREE_TIER',
+      note: 'Google Calendar API es gratuito sin límites de facturación'
+    }
+  };
+
+  res.json({
+    success: true,
+    usage: usageStats,
+    recommendations: {
+      googleMaps: dailyMapsAPIUsage >= DAILY_MAPS_API_LIMIT * 0.8 ? 
+        'Considera reducir validaciones o aumentar límite diario' : 
+        'Uso normal, dentro de límites seguros'
+    }
+  });
 });
 
 app.listen(PORT, () => {
