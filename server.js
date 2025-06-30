@@ -866,6 +866,29 @@ async function validateBookingSchedule(newBooking, existingBookings) {
   }
 }
 
+// Debug endpoint para verificar fechas
+app.post('/api/debug/date', (req, res) => {
+  const { delivery_date, delivery_time } = req.body;
+  
+  const nowCDMX = moment.tz('America/Mexico_City');
+  const todayCDMX = nowCDMX.format('YYYY-MM-DD');
+  const deliveryDateTime = moment.tz(`${delivery_date} ${delivery_time}`, 'YYYY-MM-DD HH:mm', 'America/Mexico_City');
+  
+  res.json({
+    received: {
+      delivery_date,
+      delivery_time
+    },
+    server: {
+      now_cdmx: nowCDMX.format('YYYY-MM-DD HH:mm:ss'),
+      today_cdmx: todayCDMX,
+      delivery_datetime: deliveryDateTime.format('YYYY-MM-DD HH:mm:ss'),
+      is_same_day: delivery_date === todayCDMX,
+      is_before_now: deliveryDateTime.isBefore(nowCDMX)
+    }
+  });
+});
+
 // Create a new booking
 app.post('/api/bookings', async (req, res) => {
   const {
@@ -883,11 +906,7 @@ app.post('/api/bookings', async (req, res) => {
     const nowCDMX = moment.tz('America/Mexico_City');
     const todayCDMX = nowCDMX.format('YYYY-MM-DD');
 
-    if (delivery_date === todayCDMX) {
-      return res.status(400).json({
-        error: 'No se puede reservar para el mismo día.'
-      });
-    }
+    // Permitir reservas para el mismo día si el horario no ha pasado
 
     if (deliveryDateTime.isBefore(nowCDMX)) {
       return res.status(400).json({
