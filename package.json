@@ -6,7 +6,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "node scripts/init-data.js && vercel dev",
-    "build": "node scripts/init-data.js",
+    "build": "node scripts/init-data.js && echo 'Build completed'",
     "deploy": "vercel --prod",
     "init-data": "node scripts/init-data.js"
   },
