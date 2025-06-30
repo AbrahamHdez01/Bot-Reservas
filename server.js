@@ -448,15 +448,7 @@ async function getTransitTime(origin, destination) {
   }
 }
 
-// Cargar estaciones del Metro CDMX
-let metroStations = {};
-try {
-  const metroStationsData = fs.readFileSync('./metro_stations.json', 'utf8');
-  metroStations = JSON.parse(metroStationsData);
-  console.log('✅ Estaciones del Metro CDMX cargadas correctamente');
-} catch (error) {
-  console.error('❌ Error cargando estaciones del metro:', error.message);
-}
+// Metro stations data moved to hardcoded section in initDatabase() for serverless compatibility
 
 // API Routes
 
@@ -484,41 +476,64 @@ app.get('/api/metro-stations', (req, res) => {
 
 // Get stations by line
 app.get('/api/metro-stations/line/:lineNumber', (req, res) => {
-  try {
-    const { lineNumber } = req.params;
-    
-    if (!metroStations[lineNumber]) {
-      return res.status(404).json({
-        success: false,
-        error: `Línea ${lineNumber} no encontrada`
+  const { lineNumber } = req.params;
+  
+  db.all('SELECT * FROM metro_stations WHERE line = ? AND available = 1 ORDER BY name', [lineNumber], (err, rows) => {
+    if (err) {
+      console.error('Error obteniendo estaciones por línea:', err);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Error al obtener las estaciones de la línea' 
       });
     }
 
-    const stationsInLine = metroStations[lineNumber].filter(station => station.available);
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: `Línea ${lineNumber} no encontrada o sin estaciones disponibles`
+      });
+    }
+
+    const stations = rows.map(station => ({
+      name: station.name,
+      line: station.line,
+      latitude: station.latitude,
+      longitude: station.longitude,
+      available: !!station.available,
+      reason: station.reason || null
+    }));
     
     res.json({
       success: true,
       line: lineNumber,
-      stations: stationsInLine,
-      total: stationsInLine.length
+      stations: stations,
+      total: stations.length
     });
-  } catch (error) {
-    console.error('Error obteniendo estaciones por línea:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las estaciones de la línea' 
-    });
-  }
+  });
 });
 
 // Get all metro lines
 app.get('/api/metro-lines', (req, res) => {
-  try {
-    const lines = Object.keys(metroStations).map(line => ({
-      number: line,
-      name: `Línea ${line}`,
-      totalStations: metroStations[line].length,
-      availableStations: metroStations[line].filter(s => s.available).length
+  db.all(`SELECT 
+    line,
+    COUNT(*) as totalStations,
+    SUM(available) as availableStations
+  FROM metro_stations 
+  GROUP BY line 
+  ORDER BY line`, (err, rows) => {
+    if (err) {
+      console.error('Error obteniendo líneas:', err);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Error al obtener las líneas del metro' 
+      });
+    }
+
+    const lines = rows.map(row => ({
+      number: row.line,
+      name: `Línea ${row.line}`,
+      totalStations: row.totalStations,
+      availableStations: row.availableStations
     }));
 
     res.json({
@@ -526,13 +541,7 @@ app.get('/api/metro-lines', (req, res) => {
       lines: lines,
       total: lines.length
     });
-  } catch (error) {
-    console.error('Error obteniendo líneas:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las líneas del metro' 
-    });
-  }
+  });
 });
 
 // Mantener el endpoint legacy para compatibilidad
