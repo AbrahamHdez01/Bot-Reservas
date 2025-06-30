@@ -5,10 +5,9 @@
   "type": "module",
   "main": "index.html",
   "scripts": {
-    "dev": "node scripts/init-data.js && vercel dev",
-    "build": "node scripts/init-data.js && echo 'Build completed'",
-    "deploy": "vercel --prod",
-    "init-data": "node scripts/init-data.js"
+    "dev": "vercel dev",
+    "build": "echo 'No build needed'",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "googleapis": "^128.0.0"
