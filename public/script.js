@@ -1,28 +1,39 @@
+// Variables globales
+let cart = [];
+let estaciones = [];
+let productos = {};
+
 // Cargar estaciones y productos
 async function cargarDatos() {
-  const metroStations = await fetch('/metro_stations.json').then(r => r.json());
-  const productos = await fetch('/productos.json').then(r => r.json());
-  
-  // Filtrar solo estaciones disponibles y aplanar la estructura
-  const estaciones = [];
-  Object.entries(metroStations).forEach(([linea, stations]) => {
-    stations.forEach(station => {
-      if (station.available) {
-        estaciones.push({
-          nombre: station.name,
-          linea: linea
-        });
-      }
+  try {
+    const metroStations = await fetch('/metro_stations.json').then(r => r.json());
+    const productosData = await fetch('/productos.json').then(r => r.json());
+    
+    // Filtrar solo estaciones disponibles y aplanar la estructura
+    estaciones = [];
+    Object.entries(metroStations).forEach(([linea, stations]) => {
+      stations.forEach(station => {
+        if (station.available) {
+          estaciones.push({
+            nombre: station.name,
+            linea: linea
+          });
+        }
+      });
     });
-  });
-  
-  return { estaciones, productos };
+    
+    productos = productosData;
+    return { estaciones, productos };
+  } catch (error) {
+    console.error('Error cargando datos:', error);
+    showMessage('Error cargando los datos. Por favor recarga la página.', 'error');
+  }
 }
 
 // Renderizar estaciones
-function renderEstaciones(estaciones) {
+function renderEstaciones() {
   const select = document.getElementById('estacion');
-  select.innerHTML = '';
+  select.innerHTML = '<option value="">Selecciona una estación</option>';
   estaciones.forEach(e => {
     const opt = document.createElement('option');
     opt.value = e.nombre;
@@ -31,18 +42,37 @@ function renderEstaciones(estaciones) {
   });
 }
 
-// Renderizar productos
-function renderProductos(productos) {
+// Renderizar productos como tarjetas
+function renderProductos() {
   const cont = document.getElementById('productos');
   cont.innerHTML = '';
+  
   Object.entries(productos).forEach(([cat, items]) => {
-    const group = document.createElement('div');
-    group.innerHTML = `<strong>${cat.replace('_', ' ').toUpperCase()}:</strong><br>`;
+    const categoryDiv = document.createElement('div');
+    categoryDiv.className = 'product-category';
+    
+    const categoryTitle = document.createElement('h3');
+    categoryTitle.textContent = cat.replace('_', ' ').toUpperCase();
+    categoryTitle.style.gridColumn = '1 / -1';
+    categoryTitle.style.color = 'var(--primary-color)';
+    categoryTitle.style.marginTop = '20px';
+    categoryTitle.style.marginBottom = '15px';
+    categoryTitle.style.borderBottom = '2px solid var(--primary-color)';
+    categoryTitle.style.paddingBottom = '10px';
+    cont.appendChild(categoryTitle);
+    
     items.forEach(prod => {
-      const id = `${cat}-${prod}`.replace(/\W+/g, '');
-      group.innerHTML += `<label><input type="checkbox" name="producto" value="${prod}"> ${prod}</label><br>`;
+      const productCard = document.createElement('div');
+      productCard.className = 'product-card';
+      productCard.innerHTML = `
+        <h3>${prod}</h3>
+        <p>Categoría: ${cat.replace('_', ' ')}</p>
+        <button class="add-to-cart-btn" onclick="addToCart('${prod}', '${cat}')">
+          <i class="fas fa-plus"></i> Agregar al Carrito
+        </button>
+      `;
+      cont.appendChild(productCard);
     });
-    cont.appendChild(group);
   });
 }
 
@@ -114,38 +144,153 @@ async function insertarEnGoogleCalendar({nombre, estacion, productos, fecha, hor
   }
 }
 
+// Funciones del carrito
+function addToCart(producto, categoria) {
+  const existingItem = cart.find(item => item.producto === producto);
+  
+  if (existingItem) {
+    existingItem.cantidad += 1;
+  } else {
+    cart.push({
+      producto,
+      categoria,
+      cantidad: 1
+    });
+  }
+  
+  updateCartDisplay();
+  showMessage(`${producto} agregado al carrito`, 'success');
+}
+
+function removeFromCart(index) {
+  cart.splice(index, 1);
+  updateCartDisplay();
+}
+
+function updateQuantity(index, change) {
+  cart[index].cantidad += change;
+  
+  if (cart[index].cantidad <= 0) {
+    removeFromCart(index);
+  } else {
+    updateCartDisplay();
+  }
+}
+
+function updateCartDisplay() {
+  const cartCount = document.getElementById('cart-count');
+  const cartItems = document.getElementById('cart-items');
+  const cartTotal = document.getElementById('cart-total');
+  
+  // Actualizar contador
+  const totalItems = cart.reduce((sum, item) => sum + item.cantidad, 0);
+  cartCount.textContent = totalItems;
+  
+  // Actualizar items del carrito
+  cartItems.innerHTML = '';
+  cart.forEach((item, index) => {
+    const cartItem = document.createElement('div');
+    cartItem.className = 'cart-item';
+    cartItem.innerHTML = `
+      <div class="cart-item-info">
+        <h4>${item.producto}</h4>
+        <p>${item.categoria.replace('_', ' ')}</p>
+      </div>
+      <div class="cart-item-actions">
+        <button class="quantity-btn" onclick="updateQuantity(${index}, -1)">-</button>
+        <span>${item.cantidad}</span>
+        <button class="quantity-btn" onclick="updateQuantity(${index}, 1)">+</button>
+        <button class="remove-btn" onclick="removeFromCart(${index})">Eliminar</button>
+      </div>
+    `;
+    cartItems.appendChild(cartItem);
+  });
+  
+  // Actualizar total
+  cartTotal.textContent = totalItems;
+}
+
+function toggleCart() {
+  const cartSidebar = document.getElementById('cart-sidebar');
+  cartSidebar.classList.toggle('open');
+}
+
+function proceedToCheckout() {
+  if (cart.length === 0) {
+    showMessage('Agrega productos al carrito primero', 'error');
+    return;
+  }
+  
+  document.querySelector('.products-section').style.display = 'none';
+  document.getElementById('checkout-section').style.display = 'block';
+  
+  // Mostrar productos seleccionados
+  const selectedProductsList = document.getElementById('selected-products-list');
+  selectedProductsList.innerHTML = '';
+  
+  cart.forEach(item => {
+    const productDiv = document.createElement('div');
+    productDiv.className = 'selected-product';
+    productDiv.innerHTML = `
+      <span>${item.producto} (${item.categoria.replace('_', ' ')})</span>
+      <span>Cantidad: ${item.cantidad}</span>
+    `;
+    selectedProductsList.appendChild(productDiv);
+  });
+  
+  toggleCart();
+}
+
+function showMessage(message, type = 'success') {
+  const resultado = document.getElementById('resultado');
+  resultado.innerHTML = `<div class="result-message ${type}">${message}</div>`;
+  
+  setTimeout(() => {
+    resultado.innerHTML = '';
+  }, 5000);
+}
+
+// Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
-  const { estaciones, productos } = await cargarDatos();
-  renderEstaciones(estaciones);
-  renderProductos(productos);
+  await cargarDatos();
+  renderEstaciones();
+  renderProductos();
 
   document.getElementById('reserva-form').onsubmit = async e => {
     e.preventDefault();
+    
+    if (cart.length === 0) {
+      showMessage('Agrega productos al carrito primero', 'error');
+      return;
+    }
+    
     const nombre = document.getElementById('nombre').value.trim();
     const telefono = document.getElementById('telefono').value.trim();
     const estacion = document.getElementById('estacion').value;
     const fecha = document.getElementById('fecha').value;
     const hora = document.getElementById('hora').value;
-    const productosSel = Array.from(document.querySelectorAll('input[name=producto]:checked')).map(i => i.value);
 
-    if (!nombre || !telefono || !estacion || !fecha || !hora || productosSel.length === 0) {
-      document.getElementById('resultado').textContent = 'Completa todos los campos.';
+    if (!nombre || !telefono || !estacion || !fecha || !hora) {
+      showMessage('Completa todos los campos', 'error');
       return;
     }
     
     const errorTelefono = validarTelefono(telefono);
     if (errorTelefono) {
-      document.getElementById('resultado').textContent = errorTelefono;
+      showMessage(errorTelefono, 'error');
       return;
     }
     
     const error = validarFechaHora(fecha, hora);
     if (error) {
-      document.getElementById('resultado').textContent = error;
+      showMessage(error, 'error');
       return;
     }
 
-    // Calcular ETA (simulado)
+    // Preparar productos para la API
+    const productosSel = cart.map(item => `${item.producto} (x${item.cantidad})`);
+
+    // Calcular ETA
     const origen = 'Centro Histórico CDMX';
     const destino = estacion;
     const eta = await calcularETA(origen, destino);
@@ -175,29 +320,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       
       if (!reservaGuardada.ok) {
-        throw new Error('Error guardando la reserva');
+        const errorData = await reservaGuardada.json();
+        throw new Error(errorData.error || 'Error guardando la reserva');
       }
       
-      document.getElementById('resultado').innerHTML = `
-        <div style="background: #d4edda; color: #155724; padding: 1em; border-radius: 4px; margin: 1em 0;">
-          <h3>¡Reserva creada exitosamente!</h3>
-          <p><strong>Cliente:</strong> ${nombre}</p>
-          <p><strong>Teléfono:</strong> ${telefono}</p>
-          <p><strong>Estación:</strong> ${estacion}</p>
-          <p><strong>Fecha:</strong> ${fecha} a las ${hora}</p>
-          <p><strong>Productos:</strong> ${productosSel.join(', ')}</p>
-          <p><strong>Duración estimada:</strong> ${eta.minutos + 10} minutos</p>
-          <p><a href="${resultado.eventLink}" target="_blank">Ver evento en Google Calendar</a></p>
-        </div>
-      `;
+      const reservaData = await reservaGuardada.json();
+      
+      showMessage(`
+        <h3>¡Reserva creada exitosamente!</h3>
+        <p><strong>Cliente:</strong> ${nombre}</p>
+        <p><strong>Teléfono:</strong> ${telefono}</p>
+        <p><strong>Estación:</strong> ${estacion}</p>
+        <p><strong>Fecha:</strong> ${fecha} a las ${hora}</p>
+        <p><strong>Productos:</strong> ${productosSel.join(', ')}</p>
+        <p><strong>Duración estimada:</strong> ${eta.minutos + 10} minutos</p>
+        <p><a href="${resultado.eventLink}" target="_blank">Ver evento en Google Calendar</a></p>
+      `, 'success');
+      
+      // Limpiar carrito y formulario
+      cart = [];
+      updateCartDisplay();
       e.target.reset();
+      
+      // Volver a la sección de productos
+      document.querySelector('.products-section').style.display = 'block';
+      document.getElementById('checkout-section').style.display = 'none';
+      
     } catch (error) {
-      document.getElementById('resultado').innerHTML = `
-        <div style="background: #f8d7da; color: #721c24; padding: 1em; border-radius: 4px; margin: 1em 0;">
-          <h3>Error al crear la reserva</h3>
-          <p>${error.message}</p>
-        </div>
-      `;
+      console.error('Error completo:', error);
+      showMessage(`Error al crear la reserva: ${error.message}`, 'error');
     }
   };
 }); 
