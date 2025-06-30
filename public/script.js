@@ -1,5 +1,5 @@
 // Variables globales
-let productos = [];
+let productos = {};
 let carrito = [];
 let estaciones = [];
 
@@ -37,42 +37,47 @@ async function cargarProductos() {
     try {
         const response = await fetch('/productos.json');
         productos = await response.json();
-        mostrarProductos();
+        mostrarProductosPorCategoria();
     } catch (error) {
         console.error('Error cargando productos:', error);
         mostrarError('Error cargando productos');
     }
 }
 
-// Mostrar productos en la grilla
-function mostrarProductos() {
+// Mostrar productos agrupados por categoría
+function mostrarProductosPorCategoria() {
     const productsGrid = document.getElementById('productsGrid');
     productsGrid.innerHTML = '';
 
-    productos.forEach(producto => {
-        const productCard = document.createElement('div');
-        productCard.className = 'product-card';
-        productCard.innerHTML = `
-            <img src="${producto.imagen || 'https://via.placeholder.com/300x200?text=Producto'}" 
-                 alt="${producto.nombre}" class="product-image">
-            <div class="product-info">
-                <h3>${producto.nombre}</h3>
-                <p class="product-description">${producto.descripcion}</p>
-                <div class="product-price">$${producto.precio}</div>
-                <div class="product-actions">
-                    <div class="quantity-controls">
-                        <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', -1)">-</button>
-                        <span class="quantity-display" id="qty-${producto.id}">0</span>
-                        <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', 1)">+</button>
+    for (const categoria in productos) {
+        if (!productos.hasOwnProperty(categoria)) continue;
+        const categoriaDiv = document.createElement('div');
+        categoriaDiv.className = 'categoria-productos';
+        categoriaDiv.innerHTML = `<h3 style="margin-bottom: 0.5rem; color: var(--primary-color); text-transform: capitalize;">${categoria.replace('_', ' ')}</h3>`;
+
+        productos[categoria].forEach(producto => {
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card';
+            productCard.innerHTML = `
+                <div class="product-info">
+                    <h4 style="margin-bottom: 0.5rem;">${producto.nombre}</h4>
+                    <div class="product-price">$${producto.precio}</div>
+                    <div class="product-actions">
+                        <div class="quantity-controls">
+                            <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', -1)">-</button>
+                            <span class="quantity-display" id="qty-${producto.id}">0</span>
+                            <button class="quantity-btn" onclick="cambiarCantidad('${producto.id}', 1)">+</button>
+                        </div>
+                        <button class="add-to-cart-btn" onclick="agregarAlCarrito('${producto.id}')">
+                            Agregar
+                        </button>
                     </div>
-                    <button class="add-to-cart-btn" onclick="agregarAlCarrito('${producto.id}')">
-                        Agregar
-                    </button>
                 </div>
-            </div>
-        `;
-        productsGrid.appendChild(productCard);
-    });
+            `;
+            categoriaDiv.appendChild(productCard);
+        });
+        productsGrid.appendChild(categoriaDiv);
+    }
 }
 
 // Cambiar cantidad de producto
@@ -85,13 +90,20 @@ function cambiarCantidad(productoId, cambio) {
 
 // Agregar al carrito
 function agregarAlCarrito(productoId) {
+    let producto = null;
+    for (const categoria in productos) {
+        if (!productos.hasOwnProperty(categoria)) continue;
+        producto = productos[categoria].find(p => p.id === productoId);
+        if (producto) break;
+    }
+    if (!producto) return;
+
     const cantidad = parseInt(document.getElementById(`qty-${productoId}`).textContent);
     if (cantidad === 0) {
         mostrarError('Selecciona una cantidad mayor a 0');
         return;
     }
 
-    const producto = productos.find(p => p.id === productoId);
     const itemExistente = carrito.find(item => item.id === productoId);
 
     if (itemExistente) {
@@ -192,29 +204,7 @@ async function cargarEstaciones() {
         const data = await response.json();
         
         // Filtrar estaciones según las reglas de negocio
-        estaciones = data.filter(estacion => {
-            const nombre = estacion.nombre.toLowerCase();
-            
-            // Línea 8: Constitución a Santa Anita (desde 8:30 am)
-            if (estacion.linea === '8' && 
-                ['constitución', 'chabacano', 'la viga', 'santa anita'].some(n => nombre.includes(n))) {
-                return true;
-            }
-            
-            // Periférico Oriente a Atlalilco (desde 8:30 am)
-            if (['periférico oriente', 'atlalilco'].some(n => nombre.includes(n))) {
-                return true;
-            }
-            
-            // Mixcoac a Polanco (desde 8:30 am)
-            if (['mixcoac', 'insurgentes sur', 'polanco'].some(n => nombre.includes(n))) {
-                return true;
-            }
-            
-            // Otras estaciones (10 am a 5 pm)
-            return true;
-        });
-
+        estaciones = data.filter(estacion => estacion.available);
         llenarSelectEstaciones();
     } catch (error) {
         console.error('Error cargando estaciones:', error);
@@ -229,8 +219,8 @@ function llenarSelectEstaciones() {
     
     estaciones.forEach(estacion => {
         const option = document.createElement('option');
-        option.value = estacion.nombre;
-        option.textContent = `${estacion.nombre} (Línea ${estacion.linea})`;
+        option.value = estacion.name;
+        option.textContent = estacion.name;
         select.appendChild(option);
     });
 }
@@ -273,13 +263,13 @@ function llenarHorasDisponibles() {
     let horaFin = 17; // 5 pm
     
     // Ajustar hora de inicio según estación
-    if (['constitución', 'chabacano', 'la viga', 'santa anita'].some(n => estacion.includes(n))) {
+    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
         // Línea 8: Constitución a Santa Anita (desde 8:30 am)
         horaInicio = 8.5; // 8:30 am
-    } else if (['periférico oriente', 'atlalilco'].some(n => estacion.includes(n))) {
+    } else if (["periférico oriente", "atlalilco"].some(n => estacion.includes(n))) {
         // Periférico Oriente a Atlalilco (desde 8:30 am)
         horaInicio = 8.5; // 8:30 am
-    } else if (['mixcoac', 'polanco'].some(n => estacion.includes(n))) {
+    } else if (["mixcoac", "polanco"].some(n => estacion.includes(n))) {
         // Mixcoac a Polanco (desde 8:30 am)
         horaInicio = 8.5; // 8:30 am
     }
