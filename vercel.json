@@ -7,8 +7,8 @@
       "config": { "distDir": "build" }
     },
     {
-      "src": "server.js",
-      "use": "@vercel/node@3.0.0"
+      "src": "package.json",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
