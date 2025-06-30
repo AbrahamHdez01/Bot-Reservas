@@ -419,35 +419,24 @@ try {
 
 // Get available metro stations (only those marked as available)
 app.get('/api/metro-stations', (req, res) => {
-  try {
-    const availableStations = [];
-    
-    // Recorrer todas las líneas y filtrar solo estaciones disponibles
-    Object.keys(metroStations).forEach(line => {
-      const stationsInLine = metroStations[line];
-      stationsInLine.forEach(station => {
-        if (station.available) {
-          availableStations.push({
-            name: station.name,
-            line: line,
-            available: station.available
-          });
-        }
-      });
-    });
-
+  db.all('SELECT * FROM metro_stations ORDER BY line, name', (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    // Si tienes un campo 'available', filtra aquí. Si no, asume que todas están disponibles.
+    const stations = rows.map(station => ({
+      name: station.name,
+      line: station.line,
+      latitude: station.latitude,
+      longitude: station.longitude,
+      available: true // O usa station.available si existe
+    }));
     res.json({
       success: true,
-      stations: availableStations,
-      total: availableStations.length
+      stations,
+      total: stations.length
     });
-  } catch (error) {
-    console.error('Error obteniendo estaciones:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Error al obtener las estaciones del metro' 
-    });
-  }
+  });
 });
 
 // Get stations by line
