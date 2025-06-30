@@ -72,6 +72,47 @@ function App() {
     fetchData();
   }, []);
 
+  // Generate time slots from 10 AM to 5:00 PM
+  const generateTimeSlots = useCallback(() => {
+    const slots = [];
+    const startHour = 10;
+    const endHour = 17;
+    const endMinute = 0;
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      const maxMinute = (hour === endHour) ? endMinute : 55;
+      
+      for (let minute = 0; minute <= maxMinute; minute += 5) {
+        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push(time);
+      }
+    }
+    return slots;
+  }, []);
+
+  const getAvailableSlots = useCallback(async (date, station = null) => {
+    try {
+      let url = `/api/available-slots/${date}`;
+      if (station) {
+        // Codificar la estación para la URL
+        url += `/${encodeURIComponent(station)}`;
+      }
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const slots = await response.json();
+        return slots;
+      } else {
+        // Fallback to generated slots if API fails
+        return generateTimeSlots();
+      }
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
+      // Fallback to generated slots
+      return generateTimeSlots();
+    }
+  }, [generateTimeSlots]);
+
   useEffect(() => {
     if (selectedDate) {
       const fetchSlots = async () => {
@@ -120,29 +161,6 @@ function App() {
       fetchSlots();
     }
   }, [selectedDate, selectedStation, getAvailableSlots]);
-
-  const getAvailableSlots = useCallback(async (date, station = null) => {
-    try {
-      let url = `/api/available-slots/${date}`;
-      if (station) {
-        // Codificar la estación para la URL
-        url += `/${encodeURIComponent(station)}`;
-      }
-      
-      const response = await fetch(url);
-      if (response.ok) {
-        const slots = await response.json();
-        return slots;
-      } else {
-        // Fallback to generated slots if API fails
-        return generateTimeSlots();
-      }
-    } catch (error) {
-      console.error('Error fetching available slots:', error);
-      // Fallback to generated slots
-      return generateTimeSlots();
-    }
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -197,26 +215,6 @@ function App() {
       setIsSubmitting(false);
     }
   };
-
-  // Generate time slots from 10 AM to 5:00 PM
-  const generateTimeSlots = () => {
-    const slots = [];
-    const startHour = 10;
-    const endHour = 17;
-    const endMinute = 0;
-    
-    for (let hour = startHour; hour <= endHour; hour++) {
-      const maxMinute = (hour === endHour) ? endMinute : 55;
-      
-      for (let minute = 0; minute <= maxMinute; minute += 5) {
-        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(time);
-      }
-    }
-    return slots;
-  };
-
-
 
   // Fetch products by category
   const fetchProductsByCategory = async (category) => {
