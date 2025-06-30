@@ -1,43 +1,20 @@
-import fs from 'fs';
-import path from 'path';
+// Almacenamiento en memoria (se reinicia con cada deploy)
+let reservasEnMemoria = [];
+let nextId = 1;
 
-const dataPath = path.join(process.cwd(), 'data', 'reservas.json');
-
-// Función para leer reservas del archivo
+// Función para leer reservas (desde memoria)
 function leerReservas() {
-  try {
-    if (fs.existsSync(dataPath)) {
-      const data = fs.readFileSync(dataPath, 'utf8');
-      return JSON.parse(data);
-    }
-    // Si no existe, crear el archivo
-    escribirReservas([]);
-    return [];
-  } catch (error) {
-    console.error('Error leyendo reservas:', error);
-    return [];
-  }
+  return reservasEnMemoria;
 }
 
-// Función para escribir reservas al archivo
+// Función para escribir reservas (en memoria)
 function escribirReservas(reservas) {
-  try {
-    // Asegurar que el directorio existe
-    const dir = path.dirname(dataPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dataPath, JSON.stringify(reservas, null, 2));
-  } catch (error) {
-    console.error('Error escribiendo reservas:', error);
-    throw error;
-  }
+  reservasEnMemoria = reservas;
 }
 
 // Obtener el siguiente ID
-function obtenerSiguienteId(reservas) {
-  if (reservas.length === 0) return 1;
-  return Math.max(...reservas.map(r => r.id)) + 1;
+function obtenerSiguienteId() {
+  return nextId++;
 }
 
 export default async function handler(req, res) {
@@ -91,10 +68,9 @@ async function crearReserva(req, res) {
     }
     
     const reservas = leerReservas();
-    const nextId = obtenerSiguienteId(reservas);
     
     const nuevaReserva = {
-      id: nextId,
+      id: obtenerSiguienteId(),
       nombre,
       telefono,
       estacion,

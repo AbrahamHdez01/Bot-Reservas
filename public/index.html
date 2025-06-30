@@ -1,103 +1,128 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reserva de Entregas Metro CDMX</title>
-  <link rel="stylesheet" href="/style.css">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservas Metro CDMX - Perfumes</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <h1><i class="fas fa-subway"></i> Reserva Metro CDMX</h1>
-      <p>Entrega de perfumes y productos en estaciones del Metro</p>
-    </header>
+    <div class="app-container">
+        <!-- Header fijo -->
+        <header class="app-header">
+            <h1>🚇 Metro CDMX</h1>
+            <h2>Reservas de Perfumes</h2>
+        </header>
 
-    <div class="cart-icon" onclick="toggleCart()">
-      <i class="fas fa-shopping-cart"></i>
-      <span class="cart-count" id="cart-count">0</span>
-    </div>
+        <!-- Navegación por pestañas -->
+        <nav class="tab-navigation">
+            <button class="tab-btn active" data-tab="products">🛍️ Productos</button>
+            <button class="tab-btn" data-tab="cart">🛒 Carrito <span class="cart-badge" id="cartBadge">0</span></button>
+            <button class="tab-btn" data-tab="reservation">📝 Reserva</button>
+        </nav>
 
-    <div class="cart-sidebar" id="cart-sidebar">
-      <div class="cart-header">
-        <h3><i class="fas fa-shopping-cart"></i> Carrito</h3>
-        <button class="close-cart" onclick="toggleCart()">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-      <div class="cart-items" id="cart-items">
-        <!-- Items del carrito se agregarán aquí -->
-      </div>
-      <div class="cart-total">
-        <strong>Total: <span id="cart-total">0</span> productos</strong>
-      </div>
-      <button class="btn btn-primary btn-full" onclick="proceedToCheckout()">
-        <i class="fas fa-check"></i> Proceder al Checkout
-      </button>
-    </div>
+        <!-- Contenido principal -->
+        <main class="app-content">
+            <!-- Pestaña Productos -->
+            <section id="products-tab" class="tab-content active">
+                <div class="products-container">
+                    <div class="products-grid" id="productsGrid">
+                        <!-- Los productos se cargarán dinámicamente -->
+                    </div>
+                </div>
+            </section>
 
-    <div class="main-content">
-      <div class="products-section">
-        <h2><i class="fas fa-box"></i> Productos Disponibles</h2>
-        <div class="products-grid" id="productos">
-          <!-- Productos se cargarán aquí -->
+            <!-- Pestaña Carrito -->
+            <section id="cart-tab" class="tab-content">
+                <div class="cart-container">
+                    <div class="cart-items" id="cartItems">
+                        <!-- Los items del carrito se mostrarán aquí -->
+                    </div>
+                    <div class="cart-summary">
+                        <div class="cart-total">
+                            <strong>Total: $<span id="cartTotal">0</span></strong>
+                        </div>
+                        <button class="btn-primary btn-full" onclick="goToReservation()">
+                            Continuar a Reserva
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pestaña Reserva -->
+            <section id="reservation-tab" class="tab-content">
+                <div class="reservation-container">
+                    <form id="reservationForm" class="reservation-form">
+                        <div class="form-group">
+                            <label for="nombre">Nombre completo</label>
+                            <input type="text" id="nombre" name="nombre" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="telefono">Teléfono (10 dígitos)</label>
+                            <input type="tel" id="telefono" name="telefono" pattern="[0-9]{10}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="estacion">Estación de Metro</label>
+                            <select id="estacion" name="estacion" required>
+                                <option value="">Selecciona una estación</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fecha">Fecha de entrega</label>
+                            <input type="date" id="fecha" name="fecha" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="hora">Hora de entrega</label>
+                            <select id="hora" name="hora" required>
+                                <option value="">Selecciona una hora</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary btn-full">
+                            Confirmar Reserva
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal de Confirmación -->
+        <div id="confirmationModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>✅ Reserva Confirmada</h3>
+                </div>
+                <div class="modal-body">
+                    <p>Tu reserva ha sido creada exitosamente.</p>
+                    <p><strong>ID de Reserva:</strong> <span id="reservationId"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeModal()" class="btn-secondary">Cerrar</button>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <div class="checkout-section" id="checkout-section" style="display: none;">
-        <h2><i class="fas fa-credit-card"></i> Información de Entrega</h2>
-        <form id="reserva-form" class="checkout-form">
-          <div class="form-group">
-            <label for="nombre">Nombre completo</label>
-            <input type="text" id="nombre" required>
-          </div>
-          
-          <div class="form-group">
-            <label for="telefono">Teléfono (10 dígitos)</label>
-            <input type="tel" id="telefono" pattern="[0-9]{10}" maxlength="10" placeholder="5512345678" required>
-          </div>
-          
-          <div class="form-group">
-            <label for="estacion">Estación de entrega</label>
-            <select id="estacion" required>
-              <option value="">Selecciona una estación</option>
-            </select>
-          </div>
-          
-          <div class="form-row">
-            <div class="form-group">
-              <label for="fecha">Fecha de entrega</label>
-              <input type="date" id="fecha" required>
+        <!-- Modal de Error -->
+        <div id="errorModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>❌ Error</h3>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeModal()" class="btn-secondary">Cerrar</button>
+                </div>
             </div>
-            
-            <div class="form-group">
-              <label for="hora">Hora de entrega</label>
-              <input type="time" id="hora" required>
-            </div>
-          </div>
-
-          <div class="selected-products">
-            <h3>Productos seleccionados:</h3>
-            <div id="selected-products-list"></div>
-          </div>
-
-          <button type="submit" class="btn btn-primary btn-full">
-            <i class="fas fa-paper-plane"></i> Confirmar Reserva
-          </button>
-        </form>
-      </div>
+        </div>
     </div>
 
-    <div id="resultado" class="result-message"></div>
-
-    <footer class="footer">
-      <a href="/admin" class="admin-link">
-        <i class="fas fa-cog"></i> Panel de Administración
-      </a>
-    </footer>
-  </div>
-
-  <script src="/script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

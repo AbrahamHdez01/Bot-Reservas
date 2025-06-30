@@ -1,212 +1,233 @@
-// Array para almacenar las reservas
+// Variables globales
 let reservas = [];
+let estaciones = [];
 
-// Cargar datos iniciales
-document.addEventListener('DOMContentLoaded', async () => {
-  await cargarEstaciones();
-  await cargarReservas();
-  actualizarEstadisticas();
-  renderizarReservas();
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    cargarReservas();
+    cargarEstaciones();
 });
 
-// Cargar estaciones para el filtro
-async function cargarEstaciones() {
-  try {
-    const metroStations = await fetch('/metro_stations.json').then(r => r.json());
-    const estaciones = [];
-    Object.entries(metroStations).forEach(([linea, stations]) => {
-      stations.forEach(station => {
-        if (station.available) {
-          estaciones.push(station.name);
+// Cargar reservas
+async function cargarReservas() {
+    try {
+        const response = await fetch('/api/reservas');
+        if (response.ok) {
+            reservas = await response.json();
+            actualizarEstadisticas();
+            mostrarReservas();
+        } else {
+            console.error('Error cargando reservas:', response.status);
         }
-      });
-    });
-    
-    const select = document.getElementById('filter-estacion');
-    estaciones.forEach(estacion => {
-      const option = document.createElement('option');
-      option.value = estacion;
-      option.textContent = estacion;
-      select.appendChild(option);
-    });
-  } catch (error) {
-    console.error('Error cargando estaciones:', error);
-  }
+    } catch (error) {
+        console.error('Error cargando reservas:', error);
+    }
 }
 
-// Cargar reservas desde la API
-async function cargarReservas() {
-  try {
-    const response = await fetch('/api/reservas');
-    if (response.ok) {
-      reservas = await response.json();
-    } else {
-      console.error('Error cargando reservas:', response.statusText);
+// Cargar estaciones para filtros
+async function cargarEstaciones() {
+    try {
+        const response = await fetch('/metro_stations.json');
+        const data = await response.json();
+        estaciones = data;
+        llenarFiltroEstaciones();
+    } catch (error) {
+        console.error('Error cargando estaciones:', error);
     }
-  } catch (error) {
-    console.error('Error cargando reservas:', error);
-  }
+}
+
+// Llenar filtro de estaciones
+function llenarFiltroEstaciones() {
+    const select = document.getElementById('filter-estacion');
+    const estacionesUnicas = [...new Set(estaciones.map(e => e.nombre))];
+    
+    estacionesUnicas.forEach(estacion => {
+        const option = document.createElement('option');
+        option.value = estacion;
+        option.textContent = estacion;
+        select.appendChild(option);
+    });
 }
 
 // Actualizar estadísticas
 function actualizarEstadisticas() {
-  const hoy = new Date().toISOString().split('T')[0];
-  
-  document.getElementById('total-reservas').textContent = reservas.length;
-  document.getElementById('reservas-hoy').textContent = reservas.filter(r => r.fecha === hoy).length;
-  document.getElementById('reservas-pendientes').textContent = reservas.filter(r => r.estado === 'pendiente').length;
-  document.getElementById('reservas-completadas').textContent = reservas.filter(r => r.estado === 'completada').length;
+    const hoy = new Date().toISOString().split('T')[0];
+    
+    const total = reservas.length;
+    const hoyCount = reservas.filter(r => r.fecha === hoy).length;
+    const pendientes = reservas.filter(r => r.estado === 'pendiente').length;
+    const completadas = reservas.filter(r => r.estado === 'completada').length;
+    
+    document.getElementById('total-reservas').textContent = total;
+    document.getElementById('reservas-hoy').textContent = hoyCount;
+    document.getElementById('reservas-pendientes').textContent = pendientes;
+    document.getElementById('reservas-completadas').textContent = completadas;
 }
 
-// Renderizar tabla de reservas
-function renderizarReservas(reservasFiltradas = reservas) {
-  const tbody = document.getElementById('reservas-tbody');
-  tbody.innerHTML = '';
-  
-  reservasFiltradas.forEach(reserva => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${reserva.id}</td>
-      <td>${reserva.nombre}</td>
-      <td>${reserva.telefono}</td>
-      <td>${reserva.estacion}</td>
-      <td>${formatearFecha(reserva.fecha)}</td>
-      <td>${reserva.hora}</td>
-      <td>${reserva.productos.join(', ')}</td>
-      <td><span class="status-${reserva.estado}">${reserva.estado}</span></td>
-      <td>
-        ${reserva.estado === 'pendiente' ? 
-          `<button class="btn btn-success" onclick="marcarCompletada(${reserva.id})">Completar</button>` : 
-          ''
-        }
-        <button class="btn btn-primary" onclick="verDetalles(${reserva.id})">Ver</button>
-        <button class="btn btn-danger" onclick="eliminarReserva(${reserva.id})">Eliminar</button>
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
+// Mostrar reservas
+function mostrarReservas(reservasFiltradas = null) {
+    const tbody = document.getElementById('reservas-tbody');
+    const reservasAMostrar = reservasFiltradas || reservas;
+    
+    if (reservasAMostrar.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="no-reservas">
+                    No hay reservas para mostrar
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    reservasAMostrar.forEach(reserva => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${reserva.id}</td>
+            <td>${reserva.nombre}</td>
+            <td>${reserva.telefono}</td>
+            <td>${reserva.estacion}</td>
+            <td>${formatearFecha(reserva.fecha)}</td>
+            <td>${reserva.hora}</td>
+            <td class="productos-list">${formatearProductos(reserva.productos)}</td>
+            <td>
+                <span class="status-${reserva.estado}">${reserva.estado}</span>
+            </td>
+            <td>
+                ${reserva.estado === 'pendiente' ? 
+                    `<button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Completar</button>` : 
+                    `<button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>`
+                }
+                <button class="btn btn-danger" onclick="eliminarReserva(${reserva.id})">🗑️ Eliminar</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
 // Formatear fecha
 function formatearFecha(fecha) {
-  const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(fecha).toLocaleDateString('es-ES', opciones);
+    const [year, month, day] = fecha.split('-');
+    return `${day}/${month}/${year}`;
+}
+
+// Formatear productos
+function formatearProductos(productos) {
+    if (!productos || !Array.isArray(productos)) return 'N/A';
+    
+    return productos.map(p => {
+        if (typeof p === 'string') {
+            return p;
+        } else if (p.nombre && p.cantidad) {
+            return `${p.nombre} (x${p.cantidad})`;
+        } else {
+            return 'Producto';
+        }
+    }).join(', ');
 }
 
 // Aplicar filtros
 function aplicarFiltros() {
-  const estacion = document.getElementById('filter-estacion').value;
-  const status = document.getElementById('filter-status').value;
-  const fecha = document.getElementById('filter-fecha').value;
-  
-  let reservasFiltradas = reservas;
-  
-  if (estacion) {
-    reservasFiltradas = reservasFiltradas.filter(r => r.estacion === estacion);
-  }
-  
-  if (status) {
-    reservasFiltradas = reservasFiltradas.filter(r => r.estado === status);
-  }
-  
-  if (fecha) {
-    reservasFiltradas = reservasFiltradas.filter(r => r.fecha === fecha);
-  }
-  
-  renderizarReservas(reservasFiltradas);
-}
-
-// Marcar reserva como completada
-async function marcarCompletada(id) {
-  try {
-    const response = await fetch(`/api/reservas?id=${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ estado: 'completada' })
-    });
+    const estacion = document.getElementById('filter-estacion').value;
+    const estado = document.getElementById('filter-status').value;
+    const fecha = document.getElementById('filter-fecha').value;
     
-    if (response.ok) {
-      await cargarReservas();
-      actualizarEstadisticas();
-      renderizarReservas();
-      alert(`Reserva ${id} marcada como completada`);
-    } else {
-      alert('Error al actualizar la reserva');
+    let reservasFiltradas = [...reservas];
+    
+    if (estacion) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.estacion === estacion);
     }
-  } catch (error) {
-    console.error('Error actualizando reserva:', error);
-    alert('Error al actualizar la reserva');
-  }
+    
+    if (estado) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.estado === estado);
+    }
+    
+    if (fecha) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.fecha === fecha);
+    }
+    
+    mostrarReservas(reservasFiltradas);
 }
 
-// Ver detalles de la reserva
-function verDetalles(id) {
-  const reserva = reservas.find(r => r.id === id);
-  if (reserva) {
-    const detalles = `
-      ID: ${reserva.id}
-      Cliente: ${reserva.nombre}
-      Teléfono: ${reserva.telefono}
-      Estación: ${reserva.estacion}
-      Fecha: ${formatearFecha(reserva.fecha)}
-      Hora: ${reserva.hora}
-      Productos: ${reserva.productos.join(', ')}
-      Estado: ${reserva.estado}
-      Event ID: ${reserva.eventId}
-    `;
-    alert(detalles);
-  }
+// Cambiar estado de reserva
+async function cambiarEstado(id, nuevoEstado) {
+    try {
+        const response = await fetch(`/api/reservas?id=${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+        
+        if (response.ok) {
+            // Actualizar la reserva local
+            const reserva = reservas.find(r => r.id === id);
+            if (reserva) {
+                reserva.estado = nuevoEstado;
+                actualizarEstadisticas();
+                mostrarReservas();
+            }
+        } else {
+            console.error('Error cambiando estado:', response.status);
+        }
+    } catch (error) {
+        console.error('Error cambiando estado:', error);
+    }
 }
 
 // Eliminar reserva
 async function eliminarReserva(id) {
-  if (confirm(`¿Estás seguro de que quieres eliminar la reserva ${id}?`)) {
-    try {
-      const response = await fetch(`/api/reservas?id=${id}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        await cargarReservas();
-        actualizarEstadisticas();
-        renderizarReservas();
-        alert(`Reserva ${id} eliminada`);
-      } else {
-        alert('Error al eliminar la reserva');
-      }
-    } catch (error) {
-      console.error('Error eliminando reserva:', error);
-      alert('Error al eliminar la reserva');
+    if (!confirm('¿Estás seguro de que quieres eliminar esta reserva?')) {
+        return;
     }
-  }
+    
+    try {
+        const response = await fetch(`/api/reservas?id=${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Remover la reserva local
+            reservas = reservas.filter(r => r.id !== id);
+            actualizarEstadisticas();
+            mostrarReservas();
+        } else {
+            console.error('Error eliminando reserva:', response.status);
+        }
+    } catch (error) {
+        console.error('Error eliminando reserva:', error);
+    }
 }
 
-// Exportar a CSV
+// Exportar reservas a CSV
 function exportarReservas() {
-  const headers = ['ID', 'Cliente', 'Teléfono', 'Estación', 'Fecha', 'Hora', 'Productos', 'Estado'];
-  const csvContent = [
-    headers.join(','),
-    ...reservas.map(r => [
-      r.id,
-      `"${r.nombre}"`,
-      r.telefono,
-      `"${r.estacion}"`,
-      r.fecha,
-      r.hora,
-      `"${r.productos.join(', ')}"`,
-      r.estado
-    ].join(','))
-  ].join('\n');
-  
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `reservas_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-} 
+    const headers = ['ID', 'Cliente', 'Teléfono', 'Estación', 'Fecha', 'Hora', 'Productos', 'Estado', 'Fecha Creación'];
+    const csvContent = [
+        headers.join(','),
+        ...reservas.map(r => [
+            r.id,
+            `"${r.nombre}"`,
+            r.telefono,
+            `"${r.estacion}"`,
+            r.fecha,
+            r.hora,
+            `"${formatearProductos(r.productos)}"`,
+            r.estado,
+            r.fechaCreacion || ''
+        ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reservas_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Recargar datos cada 30 segundos
+setInterval(cargarReservas, 30000); 
