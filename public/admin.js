@@ -186,8 +186,15 @@ function mostrarReservas(reservasAMostrar) {
 
 // Obtener botones de acciones según el estado
 function getAccionesReserva(reserva) {
-    // Un solo botón para cancelar/eliminar
-    return `<button class="btn btn-danger" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>`;
+    if (reserva.estado === 'pendiente') {
+        return `
+            <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'confirmado')">✅ Confirmar</button>
+            <button class="btn btn-danger" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>
+        `;
+    } else if (reserva.estado === 'confirmado') {
+        return `<button class="btn btn-danger" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>`;
+    }
+    return '';
 }
 
 // Formatear fecha
