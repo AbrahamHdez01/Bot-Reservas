@@ -11,6 +11,27 @@ document.addEventListener('DOMContentLoaded', function() {
     configurarFormulario();
     configurarSelectorProductos();
     actualizarCarrito();
+    
+    // Escuchar cambios de reservas desde el panel de admin
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'reserva_cancelada' || e.key === 'reserva_actualizada') {
+            // Recargar horas disponibles si estamos en la pestaña de reserva
+            const fechaInput = document.getElementById('fecha');
+            const estacionSelect = document.getElementById('estacion');
+            if (fechaInput && estacionSelect && fechaInput.value && estacionSelect.value) {
+                llenarHorasDisponibles();
+            }
+        }
+    });
+    
+    // También escuchar en la misma pestaña (por si admin y frontend están en la misma ventana)
+    window.addEventListener('reserva_cancelada', function() {
+        const fechaInput = document.getElementById('fecha');
+        const estacionSelect = document.getElementById('estacion');
+        if (fechaInput && estacionSelect && fechaInput.value && estacionSelect.value) {
+            llenarHorasDisponibles();
+        }
+    });
 });
 
 // Navegación por pestañas

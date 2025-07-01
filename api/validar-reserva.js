@@ -4,12 +4,29 @@ import path from 'path';
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// Horas disponibles de 10:00 a 17:00 cada 15 minutos
-const horasDisponibles = Array.from({ length: 29 }, (_, i) => {
-  const h = 10 + Math.floor(i / 4);
-  const m = (i % 4) * 15;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-});
+// Generar horas disponibles según estación
+function generarHorasDisponibles(estacion) {
+  const estacionLower = estacion.toLowerCase();
+  let horaInicio = 10; // Por defecto 10:00
+  let horaFin = 17; // 17:00
+  
+  // Ajustar horarios según estación específica
+  if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacionLower.includes(n))) {
+    horaInicio = 8.5; // 8:30 am
+  } else if (["periférico oriente", "atlalilco"].some(n => estacionLower.includes(n))) {
+    horaInicio = 8.5; // 8:30 am
+  } else if (["mixcoac", "polanco"].some(n => estacionLower.includes(n))) {
+    horaInicio = 8.5; // 8:30 am
+  }
+
+  const horas = [];
+  for (let hora = horaInicio; hora <= horaFin; hora += 0.5) {
+    const h = Math.floor(hora);
+    const m = (hora % 1) * 60;
+    horas.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+  }
+  return horas;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,70 +47,81 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'No se pudieron cargar las estaciones' });
   }
 
-  // 1. Obtener reservas existentes para la fecha
+  const horasDisponibles = generarHorasDisponibles(estacionDeseada);
+
+  // 1. Obtener reservas existentes para la fecha con estado confirmado o pendiente
   const { data: reservas, error } = await supabase
     .from('reservas')
     .select('estacion, hora')
-    .eq('fecha', fecha);
+    .eq('fecha', fecha)
+    .in('estado', ['pendiente', 'confirmado']);
 
   if (error) {
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
   // 2. Verificar conflictos directos (misma hora y estación)
-  let horasOcupadas = new Set(reservas.map(r => r.hora));
-  if (horasOcupadas.has(horaDeseada)) {
-    // Buscar siguiente hora disponible
+  const reservaDirecta = reservas.find(r => r.hora === horaDeseada && r.estacion === estacionDeseada);
+  if (reservaDirecta) {
+    const horasOcupadas = new Set(reservas.map(r => r.hora));
     const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
     return res.status(200).json({
       disponible: false,
       horaSugerida: sugerida,
-      motivo: `Ya hay una entrega a las ${horaDeseada}`,
+      motivo: `Ya hay una entrega en ${estacionDeseada} a las ${horaDeseada}`,
       mensaje: sugerida
-        ? `Tenemos una entrega cercana a esa hora. ¿Te parece bien las ${sugerida}?`
-        : 'No hay horarios disponibles cercanos.'
+        ? `Ya tenemos una entrega a esa hora en esa estación. ¿Te parece bien las ${sugerida}?`
+        : 'No hay horarios disponibles.'
     });
   }
 
-  // 3. Verificar conflictos por traslado
-  for (const reserva of reservas) {
-    if (reserva.hora === horaDeseada) continue; // ya validado arriba
+  // 3. Verificar conflictos por tiempo de traslado
+  const [h1, m1] = horaDeseada.split(':').map(Number);
+  const minutosNueva = h1 * 60 + m1;
 
-    // Calcular diferencia de minutos entre horas
-    const [h1, m1] = horaDeseada.split(':').map(Number);
+  for (const reserva of reservas) {
+    if (reserva.estacion === estacionDeseada) continue; // ya validado arriba
+
     const [h2, m2] = reserva.hora.split(':').map(Number);
-    const minutosNueva = h1 * 60 + m1;
     const minutosExistente = h2 * 60 + m2;
 
-    // Si la diferencia es menor a 15, hay conflicto directo
-    if (Math.abs(minutosNueva - minutosExistente) < 15) {
-      const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
-      return res.status(200).json({
-        disponible: false,
-        horaSugerida: sugerida,
-        motivo: `Entrega en estación ${reserva.estacion} a las ${reserva.hora}`,
-        mensaje: sugerida
-          ? `Tenemos una entrega cercana a esa hora. ¿Te parece bien las ${sugerida}?`
-          : 'No hay horarios disponibles cercanos.'
-      });
+    // Calcular tiempo de traslado real entre estaciones
+    const duracionTraslado = await calcularTraslado(reserva.estacion, estacionDeseada, estaciones);
+    
+    // Caso 1: Nueva reserva es DESPUÉS de la existente
+    // Necesito tiempo para ir de la existente a la nueva + 15 min de entrega
+    if (minutosNueva > minutosExistente) {
+      const tiempoMinimo = minutosExistente + 15 + duracionTraslado; // 15 min entrega + traslado
+      if (minutosNueva < tiempoMinimo) {
+        const horasOcupadas = new Set(reservas.map(r => r.hora));
+        const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
+        return res.status(200).json({
+          disponible: false,
+          horaSugerida: sugerida,
+          motivo: `Entrega en ${reserva.estacion} a las ${reserva.hora}. Traslado: ${duracionTraslado} min`,
+          mensaje: sugerida
+            ? `No hay tiempo suficiente para el traslado (${duracionTraslado} min desde ${reserva.estacion}). ¿Te parece bien las ${sugerida}?`
+            : 'No hay horarios disponibles con tiempo suficiente para el traslado.'
+        });
+      }
     }
-
-    // Calcular tiempo de traslado entre estaciones
-    const duracionTraslado = await calcularTraslado(estacionDeseada, reserva.estacion, estaciones);
-    // Si el tiempo de traslado + duración (15 min) no permite llegar
-    if (
-      minutosNueva > minutosExistente &&
-      minutosNueva < minutosExistente + duracionTraslado + 15
-    ) {
-      const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
-      return res.status(200).json({
-        disponible: false,
-        horaSugerida: sugerida,
-        motivo: `Entrega en estación ${reserva.estacion} a las ${reserva.hora}`,
-        mensaje: sugerida
-          ? `Tenemos una entrega cercana a esa hora. ¿Te parece bien las ${sugerida}?`
-          : 'No hay horarios disponibles cercanos.'
-      });
+    
+    // Caso 2: Nueva reserva es ANTES de la existente  
+    // Necesito tiempo para ir de la nueva a la existente + 15 min de entrega
+    else if (minutosNueva < minutosExistente) {
+      const tiempoMinimo = minutosNueva + 15 + duracionTraslado; // 15 min entrega + traslado
+      if (tiempoMinimo > minutosExistente) {
+        const horasOcupadas = new Set(reservas.map(r => r.hora));
+        const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
+        return res.status(200).json({
+          disponible: false,
+          horaSugerida: sugerida,
+          motivo: `Entrega en ${reserva.estacion} a las ${reserva.hora}. Traslado: ${duracionTraslado} min`,
+          mensaje: sugerida
+            ? `No hay tiempo suficiente para llegar a la siguiente entrega (${duracionTraslado} min hacia ${reserva.estacion}). ¿Te parece bien las ${sugerida}?`
+            : 'No hay horarios disponibles con tiempo suficiente para el traslado.'
+        });
+      }
     }
   }
 
@@ -104,37 +132,53 @@ export default async function handler(req, res) {
 // Sugerir la siguiente hora disponible
 function sugerirHora(horasDisponibles, horasOcupadas, horaDeseada) {
   const idx = horasDisponibles.indexOf(horaDeseada);
+  
+  // Buscar hacia adelante primero
   for (let i = idx + 1; i < horasDisponibles.length; i++) {
     if (!horasOcupadas.has(horasDisponibles[i])) {
       return horasDisponibles[i];
     }
   }
+  
+  // Si no encuentra hacia adelante, buscar hacia atrás
   for (let i = idx - 1; i >= 0; i--) {
     if (!horasOcupadas.has(horasDisponibles[i])) {
       return horasDisponibles[i];
     }
   }
+  
   return null;
 }
 
-// Calcular tiempo de traslado entre estaciones usando Google Directions API
+// Calcular tiempo de traslado entre estaciones usando Google Directions API con coordenadas
 async function calcularTraslado(estacionA, estacionB, estaciones) {
   if (estacionA === estacionB) return 0;
+  
   const origen = estaciones.find(e => e.name === estacionA);
   const destino = estaciones.find(e => e.name === estacionB);
-  if (!origen || !destino) return 30; // fallback
-
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origen.name)}&destination=${encodeURIComponent(destino.name)}&mode=transit&key=${GOOGLE_MAPS_API_KEY}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (
-    data.status === 'OK' &&
-    data.routes &&
-    data.routes[0] &&
-    data.routes[0].legs &&
-    data.routes[0].legs[0]
-  ) {
-    return Math.ceil(data.routes[0].legs[0].duration.value / 60); // minutos
+  
+  if (!origen || !destino) {
+    console.warn(`Estación no encontrada: ${estacionA} o ${estacionB}`);
+    return 30; // fallback
   }
-  return 30; // fallback
+
+  try {
+    // Usar coordenadas en lugar de nombres
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origen.lat},${origen.lng}&destination=${destino.lat},${destino.lng}&mode=transit&key=${GOOGLE_MAPS_API_KEY}`;
+    
+    const resp = await fetch(url);
+    const data = await resp.json();
+    
+    if (data.status === 'OK' && data.routes && data.routes[0] && data.routes[0].legs && data.routes[0].legs[0]) {
+      const duracionMinutos = Math.ceil(data.routes[0].legs[0].duration.value / 60);
+      console.log(`Traslado ${estacionA} → ${estacionB}: ${duracionMinutos} min`);
+      return duracionMinutos;
+    } else {
+      console.warn(`Error en Directions API: ${data.status} para ${estacionA} → ${estacionB}`);
+      return 30; // fallback
+    }
+  } catch (error) {
+    console.error('Error calculando traslado:', error);
+    return 30; // fallback
+  }
 } 

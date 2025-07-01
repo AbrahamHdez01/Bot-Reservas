@@ -33,6 +33,9 @@ async function obtenerReservas(req, res) {
     
     if (estado) {
       query = query.eq('estado', estado);
+    } else if (fecha && estacion) {
+      // Si se está filtrando por fecha y estación (para dropdown), solo incluir reservas activas
+      query = query.in('estado', ['pendiente', 'confirmado']);
     }
     
     if (fecha) {

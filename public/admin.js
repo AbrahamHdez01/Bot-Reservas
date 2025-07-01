@@ -264,6 +264,12 @@ async function cambiarEstado(id, nuevoEstado) {
                 reserva.estado = nuevoEstado;
                 actualizarEstadisticas();
                 mostrarReservasFiltradas();
+                // Notificar cambio de estado al frontend principal
+                localStorage.setItem('reserva_actualizada', Date.now().toString());
+                window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'reserva_actualizada',
+                    newValue: Date.now().toString()
+                }));
             }
         } else {
             console.error('Error cambiando estado:', response.status);
@@ -379,6 +385,13 @@ async function cancelarReserva(id, calendarEventId) {
         });
         if (response.ok) {
             await cargarReservas();
+            // Notificar al frontend principal que una reserva fue cancelada
+            localStorage.setItem('reserva_cancelada', Date.now().toString());
+            // Trigger evento personalizado para otras pestañas/ventanas
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'reserva_cancelada',
+                newValue: Date.now().toString()
+            }));
         } else {
             console.error('Error cancelando reserva:', response.status);
         }
