@@ -353,7 +353,7 @@ async function crearReserva() {
 
     // Validar horario según estación
     const estacion = datos.estacion.toLowerCase();
-    const horaSeleccionada = datos.hora;
+    const horaSeleccionada = datos.hora; // Ya está en formato 24h
     let horaInicio = 10;
     let horaFin = 17;
     
@@ -419,20 +419,33 @@ async function crearReserva() {
 
 // Convertir hora formateada a número para validación
 function parseHoraToNumero(horaFormateada) {
-    const match = horaFormateada.match(/(\d+):(\d+)\s*(AM|PM)/);
-    if (!match) return 0;
-    
-    let horas = parseInt(match[1]);
-    const minutos = parseInt(match[2]);
-    const ampm = match[3];
-    
-    if (ampm === 'PM' && horas !== 12) {
-        horas += 12;
-    } else if (ampm === 'AM' && horas === 12) {
-        horas = 0;
+    // Si es formato 24h (HH:MM)
+    const match24h = horaFormateada.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24h) {
+        const horas = parseInt(match24h[1]);
+        const minutos = parseInt(match24h[2]);
+        return horas + (minutos / 60);
     }
     
-    return horas + (minutos / 60);
+    // Si es formato 12h (h:mm AM/PM)
+    const match12h = horaFormateada.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (match12h) {
+        let horas = parseInt(match12h[1]);
+        const minutos = parseInt(match12h[2]);
+        const ampm = match12h[3].toUpperCase();
+        
+        if (ampm === 'PM' && horas !== 12) {
+            horas += 12;
+        } else if (ampm === 'AM' && horas === 12) {
+            horas = 0;
+        }
+        
+        return horas + (minutos / 60);
+    }
+    
+    // Si no coincide con ningún formato, retornar 0
+    console.warn('Formato de hora no reconocido:', horaFormateada);
+    return 0;
 }
 
 // Mostrar confirmación
