@@ -85,20 +85,12 @@ export default async function handler(req, res) {
     const startDateTime = `${fecha}T${hora24}:00`;
     const endDateTime = calcularFinEvento(startDateTime, 30); // 30 minutos después
 
+    // Estado inicial
+    const estadoEvento = 'POR CONFIRMAR';
+
     const event = {
-      summary: `🚇 Entrega Metro CDMX - ${nombre}`,
-      description: `Cliente: ${nombre}
-Teléfono: ${telefono}
-Estación: ${estacion}
-Fecha: ${fecha}
-Hora: ${hora}
-
-Productos:
-${productosDesc}
-
-Total: $${total}
-
---- Reserva creada automáticamente ---`,
+      summary: `🚇 Entrega Metro CDMX - ${estadoEvento} - ${nombre}`,
+      description: `Estado: ${estadoEvento}\nCliente: ${nombre}\nTeléfono: ${telefono}\nEstación: ${estacion}\nFecha: ${fecha}\nHora: ${hora}\n\nProductos:\n${productosDesc}\n\nTotal: $${total}\n\n--- Reserva creada automáticamente ---`,
       start: {
         dateTime: startDateTime,
         timeZone: 'America/Mexico_City',

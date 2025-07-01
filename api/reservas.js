@@ -105,6 +105,37 @@ async function actualizarReserva(req, res) {
     }
     // Cambiar 'completada' a 'confirmado' para consistencia
     if (estado === 'completada') estado = 'confirmado';
+    // Si se confirma, actualizar el evento de Calendar
+    if (estado === 'confirmado') {
+      // Obtener la reserva para el eventId
+      const { data: reservaActual, error: errorGet } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!errorGet && reservaActual && reservaActual.calendar_event_id) {
+        try {
+          const oauth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000'
+          );
+          oauth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+          const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+          // Actualizar el evento
+          await calendar.events.patch({
+            calendarId: 'primary',
+            eventId: reservaActual.calendar_event_id,
+            requestBody: {
+              summary: `🚇 Entrega Metro CDMX - CONFIRMADO - ${reservaActual.nombre}`,
+              description: `Estado: CONFIRMADO\nCliente: ${reservaActual.nombre}\nTeléfono: ${reservaActual.telefono}\nEstación: ${reservaActual.estacion}\nFecha: ${reservaActual.fecha}\nHora: ${reservaActual.hora}\n\nProductos:\n${Array.isArray(reservaActual.productos) ? reservaActual.productos.map(p => `${p.nombre} (${p.cantidad}x $${p.precio})`).join('\n') : ''}\n\nTotal: $${Array.isArray(reservaActual.productos) ? reservaActual.productos.reduce((sum, p) => sum + (p.precio * p.cantidad), 0) : ''}\n\n--- Reserva actualizada automáticamente ---`,
+            }
+          });
+        } catch (err) {
+          console.error('Error actualizando evento de Calendar:', err);
+        }
+      }
+    }
     const updateData = {};
     if (estado) {
       updateData.estado = estado;

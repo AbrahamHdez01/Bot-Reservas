@@ -353,16 +353,20 @@ function obtenerReservasFiltradas() {
     return reservasFiltradas;
 }
 
-// --- AUTENTICACIÓN ADMIN ---
+// --- Overlay de contraseña admin ---
 if (!localStorage.getItem('admin_authed')) {
-    let intentos = 0;
-    async function pedirPassword() {
-        const pwd = prompt('Introduce la contraseña de administrador:');
-        if (!pwd) {
-            window.location.href = '/';
-            return;
-        }
-        // Validar contra el backend
+    document.body.innerHTML += `
+    <div id="adminOverlay" style="position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;background:#111;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+        <div style="background:#222;padding:2rem 2.5rem;border-radius:16px;box-shadow:0 4px 32px #0008;display:flex;flex-direction:column;align-items:center;">
+            <h2 style="color:#fff;margin-bottom:1.5rem;">Panel de Administración</h2>
+            <input id="adminPwdInput" type="password" placeholder="Contraseña de administrador" style="padding:0.8rem 1rem;border-radius:8px;border:none;font-size:1rem;margin-bottom:1rem;width:220px;">
+            <button id="adminPwdBtn" style="padding:0.7rem 1.5rem;border-radius:8px;background:#ff6600;color:#fff;font-weight:600;font-size:1rem;border:none;cursor:pointer;">Entrar</button>
+            <div id="adminPwdError" style="color:#ff4444;margin-top:1rem;display:none;">Contraseña incorrecta</div>
+        </div>
+    </div>
+    `;
+    document.getElementById('adminPwdBtn').onclick = async function() {
+        const pwd = document.getElementById('adminPwdInput').value;
         const resp = await fetch('/api/admin-auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -370,19 +374,13 @@ if (!localStorage.getItem('admin_authed')) {
         });
         if (resp.ok) {
             localStorage.setItem('admin_authed', '1');
-            location.reload();
+            document.getElementById('adminOverlay').remove();
         } else {
-            intentos++;
-            if (intentos >= 3) {
-                alert('Demasiados intentos. Regresando al inicio.');
-                window.location.href = '/';
-            } else {
-                alert('Contraseña incorrecta. Intenta de nuevo.');
-                pedirPassword();
-            }
+            document.getElementById('adminPwdError').style.display = 'block';
         }
-    }
-    pedirPassword();
+    };
+    // Bloquear scroll y tab
+    document.body.style.overflow = 'hidden';
 }
 
 // Cancelar reserva (elimina de calendar y dashboard)
