@@ -1,21 +1,4 @@
-// Almacenamiento en memoria (se reinicia con cada deploy)
-let reservasEnMemoria = [];
-let nextId = 1;
-
-// Función para leer reservas (desde memoria)
-function leerReservas() {
-  return reservasEnMemoria;
-}
-
-// Función para escribir reservas (en memoria)
-function escribirReservas(reservas) {
-  reservasEnMemoria = reservas;
-}
-
-// Obtener el siguiente ID
-function obtenerSiguienteId() {
-  return nextId++;
-}
+import { supabase, handleSupabaseError } from '../lib/supabase.js';
 
 export default async function handler(req, res) {
   switch (req.method) {
@@ -35,23 +18,36 @@ export default async function handler(req, res) {
 // Obtener todas las reservas
 async function obtenerReservas(req, res) {
   try {
-    const reservas = leerReservas();
     const { estacion, estado, fecha } = req.query;
-    let reservasFiltradas = [...reservas];
     
+    let query = supabase
+      .from('reservas')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    // Aplicar filtros si se proporcionan
     if (estacion) {
-      reservasFiltradas = reservasFiltradas.filter(r => r.estacion === estacion);
+      query = query.eq('estacion', estacion);
     }
     
     if (estado) {
-      reservasFiltradas = reservasFiltradas.filter(r => r.estado === estado);
+      query = query.eq('estado', estado);
     }
     
     if (fecha) {
-      reservasFiltradas = reservasFiltradas.filter(r => r.fecha === fecha);
+      query = query.eq('fecha', fecha);
     }
     
-    return res.status(200).json(reservasFiltradas);
+    const { data: reservas, error } = await query;
+    
+    if (error) {
+      const errorResponse = handleSupabaseError(error);
+      return res.status(500).json(errorResponse);
+    }
+    
+    console.log(`✅ ${reservas.length} reservas obtenidas`);
+    return res.status(200).json(reservas);
+    
   } catch (error) {
     console.error('Error obteniendo reservas:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
@@ -67,10 +63,7 @@ async function crearReserva(req, res) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
     
-    const reservas = leerReservas();
-    
     const nuevaReserva = {
-      id: obtenerSiguienteId(),
       nombre,
       telefono,
       estacion,
@@ -78,14 +71,23 @@ async function crearReserva(req, res) {
       hora,
       productos,
       estado: 'pendiente',
-      eventId: eventId || null,
-      fechaCreacion: new Date().toISOString()
+      calendar_event_id: eventId || null
     };
     
-    reservas.push(nuevaReserva);
-    escribirReservas(reservas);
+    const { data: reserva, error } = await supabase
+      .from('reservas')
+      .insert([nuevaReserva])
+      .select()
+      .single();
     
-    return res.status(201).json(nuevaReserva);
+    if (error) {
+      const errorResponse = handleSupabaseError(error);
+      return res.status(500).json(errorResponse);
+    }
+    
+    console.log('✅ Nueva reserva creada:', reserva.id);
+    return res.status(201).json(reserva);
+    
   } catch (error) {
     console.error('Error creando reserva:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
@@ -98,18 +100,33 @@ async function actualizarReserva(req, res) {
     const { id } = req.query;
     const { estado } = req.body;
     
-    const reservas = leerReservas();
-    const reserva = reservas.find(r => r.id === parseInt(id));
-    if (!reserva) {
-      return res.status(404).json({ error: 'Reserva no encontrada' });
+    if (!id) {
+      return res.status(400).json({ error: 'ID de reserva requerido' });
     }
     
+    const updateData = {};
     if (estado) {
-      reserva.estado = estado;
-      escribirReservas(reservas);
+      updateData.estado = estado;
     }
     
+    const { data: reserva, error } = await supabase
+      .from('reservas')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Reserva no encontrada' });
+      }
+      const errorResponse = handleSupabaseError(error);
+      return res.status(500).json(errorResponse);
+    }
+    
+    console.log(`✅ Estado de reserva ${id} actualizado a: ${estado}`);
     return res.status(200).json(reserva);
+    
   } catch (error) {
     console.error('Error actualizando reserva:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
@@ -121,16 +138,23 @@ async function eliminarReserva(req, res) {
   try {
     const { id } = req.query;
     
-    const reservas = leerReservas();
-    const index = reservas.findIndex(r => r.id === parseInt(id));
-    if (index === -1) {
-      return res.status(404).json({ error: 'Reserva no encontrada' });
+    if (!id) {
+      return res.status(400).json({ error: 'ID de reserva requerido' });
     }
     
-    reservas.splice(index, 1);
-    escribirReservas(reservas);
+    const { error } = await supabase
+      .from('reservas')
+      .delete()
+      .eq('id', id);
     
+    if (error) {
+      const errorResponse = handleSupabaseError(error);
+      return res.status(500).json(errorResponse);
+    }
+    
+    console.log(`🗑️ Reserva ${id} eliminada`);
     return res.status(200).json({ message: 'Reserva eliminada exitosamente' });
+    
   } catch (error) {
     console.error('Error eliminando reserva:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });

@@ -9,6 +9,7 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.50.2",
     "googleapis": "^128.0.0"
   },
   "devDependencies": {
@@ -17,4 +18,4 @@
   "engines": {
     "node": "18.x"
   }
-} 
+}

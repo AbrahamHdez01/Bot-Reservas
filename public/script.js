@@ -374,7 +374,11 @@ async function crearReserva() {
     }
 
     try {
-        // Crear evento en Google Calendar
+        console.log('🚀 Iniciando proceso de reserva...');
+        console.log('📋 Datos a enviar:', datos);
+        
+        // Crear evento en Google Calendar y guardar en base de datos
+        console.log('📅 Llamando a /api/calendar...');
         const calendarResponse = await fetch('/api/calendar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -388,25 +392,12 @@ async function crearReserva() {
             })
         });
 
-        let eventId = null;
+        console.log('📅 Respuesta de calendar:', calendarResponse.status, calendarResponse.statusText);
+        
         if (calendarResponse.ok) {
             const calendarData = await calendarResponse.json();
-            eventId = calendarData.eventId;
-        }
-
-        // Crear reserva
-        const reservaResponse = await fetch('/api/reservas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...datos,
-                eventId: eventId
-            })
-        });
-
-        if (reservaResponse.ok) {
-            const reserva = await reservaResponse.json();
-            mostrarConfirmacion(reserva.id);
+            console.log('✅ Reserva creada exitosamente:', calendarData);
+            mostrarConfirmacion(calendarData.reservaId || calendarData.eventId);
             
             // Limpiar carrito y formulario
             carrito = [];
@@ -416,11 +407,12 @@ async function crearReserva() {
             // Volver a la pestaña de productos
             document.querySelector('[data-tab="products"]').click();
         } else {
-            const error = await reservaResponse.json();
-            mostrarError(error.error || 'Error creando la reserva');
+            const errorData = await calendarResponse.json();
+            console.error('❌ Error en la reserva:', errorData);
+            mostrarError(errorData.error || 'Error creando la reserva');
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error general:', error);
         mostrarError('Error de conexión. Intenta de nuevo.');
     }
 }

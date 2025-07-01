@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { supabase, handleSupabaseError } from '../lib/supabase.js';
 
 function to24Hour(hora) {
   // Si ya es formato 24h, regresa igual
@@ -127,11 +128,46 @@ Total: $${total}
     console.log('✅ Evento creado exitosamente en Google Calendar:', response.data.id);
     console.log('🔗 Link del evento:', response.data.htmlLink);
 
+    // Guardar reserva en Supabase
+    console.log('💾 Guardando reserva en base de datos...');
+    
+    const nuevaReserva = {
+      nombre,
+      telefono,
+      estacion,
+      fecha,
+      hora: hora24,
+      productos,
+      estado: 'pendiente',
+      calendar_event_id: response.data.id
+    };
+
+    const { data: reserva, error: dbError } = await supabase
+      .from('reservas')
+      .insert([nuevaReserva])
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('❌ Error guardando en base de datos:', dbError);
+      // Aunque falle la base de datos, el evento ya está en Google Calendar
+      return res.status(200).json({
+        success: true,
+        eventId: response.data.id,
+        eventLink: response.data.htmlLink,
+        message: 'Evento creado en Google Calendar, pero hubo un error guardando en la base de datos',
+        dbError: handleSupabaseError(dbError)
+      });
+    }
+
+    console.log('✅ Reserva guardada en base de datos:', reserva.id);
+
     return res.status(200).json({
       success: true,
       eventId: response.data.id,
       eventLink: response.data.htmlLink,
-      message: 'Evento creado exitosamente en Google Calendar'
+      reservaId: reserva.id,
+      message: 'Evento creado exitosamente en Google Calendar y reserva guardada'
     });
 
   } catch (error) {
