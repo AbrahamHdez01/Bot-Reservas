@@ -60,92 +60,73 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
-  // 2. Verificar si la hora ya está ocupada (cualquier estación) - Una persona no puede estar en dos lugares al mismo tiempo
-  const reservaEnMismaHora = reservas.find(r => r.hora === horaDeseada);
-  if (reservaEnMismaHora) {
-    const horasOcupadas = new Set(reservas.map(r => r.hora));
-    const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
+  // 1. Validar empalme exacto (misma estación, misma hora, misma fecha)
+  const empalme = reservas.find(r => r.hora === horaDeseada && r.estacion === estacionDeseada);
+  if (empalme) {
     return res.status(200).json({
       disponible: false,
-      horaSugerida: sugerida,
-      motivo: `Ya tienes una entrega programada a las ${horaDeseada} en ${reservaEnMismaHora.estacion}`,
-      mensaje: sugerida
-        ? `Ya tienes una entrega a esa hora en ${reservaEnMismaHora.estacion}. ¿Te parece bien las ${sugerida}?`
-        : 'No hay horarios disponibles.'
+      motivo: 'Empalme',
+      mensaje: '¡Ups! Ya hay una entrega programada a esa hora. Por favor, elige otra.'
     });
   }
 
-  // 3. Verificar conflictos por tiempo de traslado
-  const [h1, m1] = horaDeseada.split(':').map(Number);
-  const minutosNueva = h1 * 60 + m1;
+  // 2. Validar conflictos por tiempo de llegada (Directions + 15 min)
+  const [hNueva, mNueva] = horaDeseada.split(':').map(Number);
+  const minutosNueva = hNueva * 60 + mNueva;
 
   for (const reserva of reservas) {
-    // Ya no necesitamos este check porque validamos arriba que no hay reservas en la misma hora
-    const [h2, m2] = reserva.hora.split(':').map(Number);
-    const minutosExistente = h2 * 60 + m2;
-
-    // Calcular tiempo de traslado real entre estaciones
+    if (reserva.estacion === estacionDeseada && reserva.hora === horaDeseada) continue; // ya validado arriba
+    const [hExist, mExist] = reserva.hora.split(':').map(Number);
+    const minutosExist = hExist * 60 + mExist;
+    // Solo comparar reservas el mismo día
+    // Calcular tiempo de traslado real
     const duracionTraslado = await calcularTraslado(reserva.estacion, estacionDeseada, estaciones);
-    
-    // Caso 1: Nueva reserva es DESPUÉS de la existente
-    // Necesito tiempo para ir de la existente a la nueva + 15 min de entrega
-    if (minutosNueva > minutosExistente) {
-      const tiempoMinimo = minutosExistente + 15 + duracionTraslado; // 15 min entrega + traslado
+    // Si la nueva es después de la existente
+    if (minutosNueva > minutosExist) {
+      const tiempoMinimo = minutosExist + 15 + duracionTraslado;
       if (minutosNueva < tiempoMinimo) {
-        const horasOcupadas = new Set(reservas.map(r => r.hora));
-        const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
+        // Sugerir siguiente hora válida
+        const sugerida = sugerirSiguienteHoraValida(horasDisponibles, reservas, estacionDeseada, minutosExist, 15 + duracionTraslado);
         return res.status(200).json({
           disponible: false,
-          horaSugerida: sugerida,
-          motivo: `Entrega en ${reserva.estacion} a las ${reserva.hora}. Traslado: ${duracionTraslado} min`,
-          mensaje: sugerida
-            ? `No hay tiempo suficiente para el traslado (${duracionTraslado} min desde ${reserva.estacion}). ¿Te parece bien las ${sugerida}?`
-            : 'No hay horarios disponibles con tiempo suficiente para el traslado.'
+          motivo: 'Traslado',
+          mensaje: `No hay tiempo suficiente para llegar desde la entrega anterior. Intenta a partir de las ${sugerida || 'otra hora'}.`,
+          horaSugerida: sugerida
         });
       }
     }
-    
-    // Caso 2: Nueva reserva es ANTES de la existente  
-    // Necesito tiempo para ir de la nueva a la existente + 15 min de entrega
-    else if (minutosNueva < minutosExistente) {
-      const tiempoMinimo = minutosNueva + 15 + duracionTraslado; // 15 min entrega + traslado
-      if (tiempoMinimo > minutosExistente) {
-        const horasOcupadas = new Set(reservas.map(r => r.hora));
-        const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
+    // Si la nueva es antes de la existente
+    else if (minutosNueva < minutosExist) {
+      const tiempoMinimo = minutosNueva + 15 + duracionTraslado;
+      if (tiempoMinimo > minutosExist) {
+        const sugerida = sugerirSiguienteHoraValida(horasDisponibles, reservas, estacionDeseada, minutosExist, -(15 + duracionTraslado));
         return res.status(200).json({
           disponible: false,
-          horaSugerida: sugerida,
-          motivo: `Entrega en ${reserva.estacion} a las ${reserva.hora}. Traslado: ${duracionTraslado} min`,
-          mensaje: sugerida
-            ? `No hay tiempo suficiente para llegar a la siguiente entrega (${duracionTraslado} min hacia ${reserva.estacion}). ¿Te parece bien las ${sugerida}?`
-            : 'No hay horarios disponibles con tiempo suficiente para el traslado.'
+          motivo: 'Traslado',
+          mensaje: `No hay tiempo suficiente para llegar a la siguiente entrega. Intenta antes de las ${sugerida || 'otra hora'}.`,
+          horaSugerida: sugerida
         });
       }
     }
   }
 
-  // Si no hay conflicto
+  // Si todo bien
   return res.status(200).json({ disponible: true });
 }
 
-// Sugerir la siguiente hora disponible
-function sugerirHora(horasDisponibles, horasOcupadas, horaDeseada) {
-  const idx = horasDisponibles.indexOf(horaDeseada);
-  
-  // Buscar hacia adelante primero
-  for (let i = idx + 1; i < horasDisponibles.length; i++) {
-    if (!horasOcupadas.has(horasDisponibles[i])) {
-      return horasDisponibles[i];
-    }
+// Sugerir la siguiente hora válida (opcional: solo intervalos de 30 min)
+function sugerirSiguienteHoraValida(horasDisponibles, reservas, estacionDeseada, desdeMin, margen) {
+  // Solo intervalos de 30 min
+  const horas30 = horasDisponibles.filter(h => h.endsWith(':00') || h.endsWith(':30'));
+  for (const h of horas30) {
+    const [hh, mm] = h.split(':').map(Number);
+    const min = hh * 60 + mm;
+    // No debe estar ocupada en la estación
+    if (reservas.some(r => r.hora === h && r.estacion === estacionDeseada)) continue;
+    // Debe respetar el margen
+    if (margen > 0 && min >= desdeMin + margen) return h;
+    if (margen < 0 && min <= desdeMin + margen) return h;
   }
-  
-  // Si no encuentra hacia adelante, buscar hacia atrás
-  for (let i = idx - 1; i >= 0; i--) {
-    if (!horasOcupadas.has(horasDisponibles[i])) {
-      return horasDisponibles[i];
-    }
-  }
-  
   return null;
 }
 

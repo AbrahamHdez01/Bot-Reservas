@@ -307,8 +307,10 @@ async function llenarHorasDisponibles() {
         // Si falla, no bloquea ninguna hora
     }
 
-    // Generar opciones de hora
+    // Generar opciones de hora solo en intervalos de 30 minutos
     for (let hora = horaInicio; hora <= horaFin; hora += 0.5) {
+        const minutos = (hora % 1) * 60;
+        if (minutos !== 0 && minutos !== 30) continue; // Solo :00 y :30
         const horaFormateada = formatearHora(hora);
         const hora24 = to24Hour(horaFormateada);
         if (!horasOcupadas.includes(hora24)) {
