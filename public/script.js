@@ -293,13 +293,15 @@ async function llenarHorasDisponibles() {
         horaInicio = 8.5; // 8:30 am
     }
 
-    // Consultar reservas ocupadas para la fecha y estación
+    // Consultar reservas ocupadas para la fecha (TODAS las estaciones, no solo la seleccionada)
     let horasOcupadas = [];
     try {
-        const resp = await fetch(`/api/reservas?fecha=${fechaInput.value}&estacion=${encodeURIComponent(estacion)}`);
+        const resp = await fetch(`/api/reservas?fecha=${fechaInput.value}`);
         if (resp.ok) {
             const reservasFecha = await resp.json();
-            horasOcupadas = reservasFecha.map(r => to24Hour(r.hora));
+            // Filtrar solo reservas activas (pendiente y confirmado)
+            const reservasActivas = reservasFecha.filter(r => r.estado === 'pendiente' || r.estado === 'confirmado');
+            horasOcupadas = reservasActivas.map(r => to24Hour(r.hora));
         }
     } catch (e) {
         // Si falla, no bloquea ninguna hora

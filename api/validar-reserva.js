@@ -60,17 +60,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
-  // 2. Verificar conflictos directos (misma hora y estación)
-  const reservaDirecta = reservas.find(r => r.hora === horaDeseada && r.estacion === estacionDeseada);
-  if (reservaDirecta) {
+  // 2. Verificar si la hora ya está ocupada (cualquier estación) - Una persona no puede estar en dos lugares al mismo tiempo
+  const reservaEnMismaHora = reservas.find(r => r.hora === horaDeseada);
+  if (reservaEnMismaHora) {
     const horasOcupadas = new Set(reservas.map(r => r.hora));
     const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
     return res.status(200).json({
       disponible: false,
       horaSugerida: sugerida,
-      motivo: `Ya hay una entrega en ${estacionDeseada} a las ${horaDeseada}`,
+      motivo: `Ya tienes una entrega programada a las ${horaDeseada} en ${reservaEnMismaHora.estacion}`,
       mensaje: sugerida
-        ? `Ya tenemos una entrega a esa hora en esa estación. ¿Te parece bien las ${sugerida}?`
+        ? `Ya tienes una entrega a esa hora en ${reservaEnMismaHora.estacion}. ¿Te parece bien las ${sugerida}?`
         : 'No hay horarios disponibles.'
     });
   }
@@ -80,8 +80,7 @@ export default async function handler(req, res) {
   const minutosNueva = h1 * 60 + m1;
 
   for (const reserva of reservas) {
-    if (reserva.estacion === estacionDeseada) continue; // ya validado arriba
-
+    // Ya no necesitamos este check porque validamos arriba que no hay reservas en la misma hora
     const [h2, m2] = reserva.hora.split(':').map(Number);
     const minutosExistente = h2 * 60 + m2;
 
