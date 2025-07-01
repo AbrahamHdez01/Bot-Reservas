@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import fs from 'fs/promises';
+import path from 'path';
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
   // Cargar estaciones
   let estaciones = [];
   try {
-    const estacionesRaw = await fs.readFile('public/metro_stations.json', 'utf-8');
+    const estacionesRaw = await fs.readFile(path.join(process.cwd(), 'public/metro_stations.json'), 'utf-8');
     estaciones = JSON.parse(estacionesRaw);
   } catch (e) {
     return res.status(500).json({ error: 'No se pudieron cargar las estaciones' });
