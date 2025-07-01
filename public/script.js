@@ -251,9 +251,9 @@ function llenarHorasDisponibles() {
     
     if (!fechaInput.value || !estacionSelect.value) return;
 
-    // Validar que sea lunes a viernes (bloquear sábado y domingo)
+    // Validar que sea lunes a viernes (bloquear sábado y domingo, usando UTC)
     const fecha = new Date(fechaInput.value);
-    const diaSemana = fecha.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+    const diaSemana = fecha.getUTCDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
     if (diaSemana === 0 || diaSemana === 6) {
         horaSelect.innerHTML = '<option value="">Solo se permiten reservas de lunes a viernes</option>';
         return;
@@ -351,8 +351,8 @@ async function crearReserva() {
         return;
     }
 
-    // Validar que sea lunes a viernes (bloquear sábado y domingo)
-    const diaSemana = fechaSeleccionada.getDay();
+    // Validar que sea lunes a viernes (bloquear sábado y domingo, usando UTC)
+    const diaSemana = fechaSeleccionada.getUTCDay();
     if (diaSemana === 0 || diaSemana === 6) {
         mostrarError('Solo se permiten reservas de lunes a viernes');
         return;
