@@ -97,12 +97,12 @@ function llenarFiltroEstaciones() {
 function actualizarEstadisticas() {
     const total = reservas.length;
     const pendientes = reservas.filter(r => r.estado === 'pendiente').length;
-    const completadas = reservas.filter(r => r.estado === 'completada').length;
+    const confirmadas = reservas.filter(r => r.estado === 'confirmado').length;
     const canceladas = reservas.filter(r => r.estado === 'cancelada').length;
     
     document.getElementById('total-reservas').textContent = total;
     document.getElementById('reservas-pendientes').textContent = pendientes;
-    document.getElementById('reservas-completadas').textContent = completadas;
+    document.getElementById('reservas-completadas').textContent = confirmadas;
     document.getElementById('reservas-canceladas').textContent = canceladas;
 }
 
@@ -116,7 +116,7 @@ function mostrarReservasFiltradas() {
             reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'pendiente');
             break;
         case 'completadas':
-            reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'completada');
+            reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'confirmado');
             break;
         case 'canceladas':
             reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'cancelada');

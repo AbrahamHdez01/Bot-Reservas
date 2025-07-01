@@ -28,7 +28,7 @@ async function obtenerReservas(req, res) {
     
     // Aplicar filtros si se proporcionan
     if (estacion) {
-      query = query.eq('estacion', estacion);
+      query = query.ilike('estacion', estacion);
     }
     
     if (estado) {

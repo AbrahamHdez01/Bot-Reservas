@@ -242,7 +242,7 @@ function configurarFormulario() {
 }
 
 // Llenar horas disponibles
-function llenarHorasDisponibles() {
+async function llenarHorasDisponibles() {
     const fechaInput = document.getElementById('fecha');
     const horaSelect = document.getElementById('hora');
     const estacionSelect = document.getElementById('estacion');
@@ -259,30 +259,41 @@ function llenarHorasDisponibles() {
         return;
     }
 
-    const estacion = estacionSelect.value.toLowerCase();
+    const estacion = estacionSelect.value;
     let horaInicio = 10; // Por defecto 10 am
     let horaFin = 17; // 5 pm
     
     // Ajustar hora de inicio según estación específica
-    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
-        // Línea 8: Constitución a Santa Anita (desde 8:30 am)
+    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.toLowerCase().includes(n))) {
         horaInicio = 8.5; // 8:30 am
-    } else if (["periférico oriente", "atlalilco"].some(n => estacion.includes(n))) {
-        // Periférico Oriente a Atlalilco (desde 8:30 am)
+    } else if (["periférico oriente", "atlalilco"].some(n => estacion.toLowerCase().includes(n))) {
         horaInicio = 8.5; // 8:30 am
-    } else if (["mixcoac", "polanco"].some(n => estacion.includes(n))) {
-        // Mixcoac a Polanco (desde 8:30 am)
+    } else if (["mixcoac", "polanco"].some(n => estacion.toLowerCase().includes(n))) {
         horaInicio = 8.5; // 8:30 am
     }
-    // Otras estaciones mantienen 10 am a 5 pm
+
+    // Consultar reservas ocupadas para la fecha y estación
+    let horasOcupadas = [];
+    try {
+        const resp = await fetch(`/api/reservas?fecha=${fechaInput.value}&estacion=${encodeURIComponent(estacion)}`);
+        if (resp.ok) {
+            const reservasFecha = await resp.json();
+            horasOcupadas = reservasFecha.map(r => to24Hour(r.hora));
+        }
+    } catch (e) {
+        // Si falla, no bloquea ninguna hora
+    }
 
     // Generar opciones de hora
     for (let hora = horaInicio; hora <= horaFin; hora += 0.5) {
         const horaFormateada = formatearHora(hora);
-        const option = document.createElement('option');
-        option.value = horaFormateada;
-        option.textContent = horaFormateada;
-        horaSelect.appendChild(option);
+        const hora24 = to24Hour(horaFormateada);
+        if (!horasOcupadas.includes(hora24)) {
+            const option = document.createElement('option');
+            option.value = horaFormateada;
+            option.textContent = horaFormateada;
+            horaSelect.appendChild(option);
+        }
     }
 }
 

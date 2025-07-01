@@ -80,10 +80,10 @@ export default async function handler(req, res) {
 
     // Calcular tiempo de traslado entre estaciones
     const duracionTraslado = await calcularTraslado(estacionDeseada, reserva.estacion, estaciones);
-    // Si el tiempo de traslado + margen (5 min) + duración (15 min) no permite llegar
+    // Si el tiempo de traslado + duración (15 min) no permite llegar
     if (
       minutosNueva > minutosExistente &&
-      minutosNueva < minutosExistente + 15 + duracionTraslado + 5
+      minutosNueva < minutosExistente + duracionTraslado + 15
     ) {
       const sugerida = sugerirHora(horasDisponibles, horasOcupadas, horaDeseada);
       return res.status(200).json({
