@@ -297,7 +297,14 @@ function formatearHora(hora) {
 
 // Convierte hora de 12h a 24h
 function to24Hour(hora) {
-  if (/^\d{2}:\d{2}$/.test(hora)) return hora;
+  // Si ya es formato 24h, normalizar a HH:MM
+  const match24 = hora.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    let h = parseInt(match24[1], 10);
+    let m = match24[2];
+    return `${h.toString().padStart(2, '0')}:${m}`;
+  }
+  // Si es formato 12h con AM/PM
   const match = hora.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!match) return hora;
   let [_, h, m, ampm] = match;

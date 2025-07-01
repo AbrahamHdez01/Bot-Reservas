@@ -1,4 +1,5 @@
 import { supabase, handleSupabaseError } from '../lib/supabase.js';
+import { google } from 'googleapis';
 
 export default async function handler(req, res) {
   switch (req.method) {
@@ -98,24 +99,22 @@ async function crearReserva(req, res) {
 async function actualizarReserva(req, res) {
   try {
     const { id } = req.query;
-    const { estado } = req.body;
-    
+    let { estado } = req.body;
     if (!id) {
       return res.status(400).json({ error: 'ID de reserva requerido' });
     }
-    
+    // Cambiar 'completada' a 'confirmado' para consistencia
+    if (estado === 'completada') estado = 'confirmado';
     const updateData = {};
     if (estado) {
       updateData.estado = estado;
     }
-    
     const { data: reserva, error } = await supabase
       .from('reservas')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
-    
     if (error) {
       if (error.code === 'PGRST116') {
         return res.status(404).json({ error: 'Reserva no encontrada' });
@@ -123,40 +122,67 @@ async function actualizarReserva(req, res) {
       const errorResponse = handleSupabaseError(error);
       return res.status(500).json(errorResponse);
     }
-    
     console.log(`✅ Estado de reserva ${id} actualizado a: ${estado}`);
     return res.status(200).json(reserva);
-    
   } catch (error) {
     console.error('Error actualizando reserva:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
-// Eliminar reserva
+// Eliminar reserva (y evento de calendar si aplica)
 async function eliminarReserva(req, res) {
   try {
-    const { id } = req.query;
-    
+    const { id, calendar_event_id } = req.query;
     if (!id) {
       return res.status(400).json({ error: 'ID de reserva requerido' });
     }
-    
+    // Si hay calendar_event_id, eliminar de Google Calendar
+    if (calendar_event_id) {
+      try {
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000'
+        );
+        oauth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+        await calendar.events.delete({
+          calendarId: 'primary',
+          eventId: calendar_event_id
+        });
+        console.log(`🗑️ Evento de Calendar ${calendar_event_id} eliminado`);
+      } catch (err) {
+        console.error('Error eliminando evento de Calendar:', err);
+      }
+    }
+    // Eliminar reserva de la base de datos
     const { error } = await supabase
       .from('reservas')
       .delete()
       .eq('id', id);
-    
     if (error) {
       const errorResponse = handleSupabaseError(error);
       return res.status(500).json(errorResponse);
     }
-    
     console.log(`🗑️ Reserva ${id} eliminada`);
     return res.status(200).json({ message: 'Reserva eliminada exitosamente' });
-    
   } catch (error) {
     console.error('Error eliminando reserva:', error);
     return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+// Endpoint para autenticación admin
+export async function config(req, res) {
+  if (req.method === 'POST') {
+    const { password } = req.body;
+    if (password === process.env.ADMIN_PASSWORD) {
+      return res.status(200).json({ success: true });
+    } else {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+  } else {
+    return res.status(405).json({ error: 'Método no permitido' });
   }
 } 

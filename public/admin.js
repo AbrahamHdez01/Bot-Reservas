@@ -158,6 +158,7 @@ function mostrarReservas(reservasAMostrar) {
     
     reservasAMostrar.forEach(reserva => {
         const row = document.createElement('tr');
+        let estadoTexto = reserva.estado === 'pendiente' ? 'POR CONFIRMAR' : reserva.estado === 'confirmado' ? 'CONFIRMADO' : reserva.estado.toUpperCase();
         row.innerHTML = `
             <td>${reserva.id}</td>
             <td>${reserva.nombre}</td>
@@ -167,7 +168,7 @@ function mostrarReservas(reservasAMostrar) {
             <td>${formatearHora(reserva.hora)}</td>
             <td class="productos-list">${formatearProductos(reserva.productos)}</td>
             <td>
-                <span class="status-${reserva.estado}">${reserva.estado}</span>
+                <span class="status-${reserva.estado}">${estadoTexto}</span>
             </td>
             <td>
                 ${reserva.calendar_event_id ? 
@@ -190,20 +191,14 @@ function getAccionesReserva(reserva) {
     switch(reserva.estado) {
         case 'pendiente':
             acciones = `
-                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Confirmar</button>
-                <button class="btn btn-warning" onclick="cambiarEstado(${reserva.id}, 'cancelada')">❌ Cancelar</button>
+                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'confirmado')">✅ Confirmar</button>
+                <button class="btn btn-warning" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>
             `;
             break;
-        case 'completada':
+        case 'confirmado':
             acciones = `
-                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>
-                <button class="btn btn-warning" onclick="cambiarEstado(${reserva.id}, 'cancelada')">❌ Cancelar</button>
-            `;
-            break;
-        case 'cancelada':
-            acciones = `
-                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>
-                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Confirmar</button>
+                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Por Confirmar</button>
+                <button class="btn btn-warning" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>
             `;
             break;
     }
@@ -356,4 +351,53 @@ function obtenerReservasFiltradas() {
     }
     
     return reservasFiltradas;
+}
+
+// --- AUTENTICACIÓN ADMIN ---
+if (!localStorage.getItem('admin_authed')) {
+    let intentos = 0;
+    async function pedirPassword() {
+        const pwd = prompt('Introduce la contraseña de administrador:');
+        if (!pwd) {
+            window.location.href = '/';
+            return;
+        }
+        // Validar contra el backend
+        const resp = await fetch('/api/admin-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd })
+        });
+        if (resp.ok) {
+            localStorage.setItem('admin_authed', '1');
+            location.reload();
+        } else {
+            intentos++;
+            if (intentos >= 3) {
+                alert('Demasiados intentos. Regresando al inicio.');
+                window.location.href = '/';
+            } else {
+                alert('Contraseña incorrecta. Intenta de nuevo.');
+                pedirPassword();
+            }
+        }
+    }
+    pedirPassword();
+}
+
+// Cancelar reserva (elimina de calendar y dashboard)
+async function cancelarReserva(id, calendarEventId) {
+    if (!confirm('¿Estás seguro de que quieres cancelar esta reserva? Se eliminará del calendario.')) return;
+    try {
+        const response = await fetch(`/api/reservas?id=${id}&calendar_event_id=${calendarEventId}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            await cargarReservas();
+        } else {
+            console.error('Error cancelando reserva:', response.status);
+        }
+    } catch (error) {
+        console.error('Error cancelando reserva:', error);
+    }
 } 

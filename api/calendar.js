@@ -79,11 +79,11 @@ export default async function handler(req, res) {
 
     console.log('📅 Preparando evento...');
 
-    // Convertir hora a formato 24h
-    const hora24 = to24Hour(hora);
-    // Crear evento
-    const startTime = new Date(`${fecha}T${hora24}:00`);
-    const endTime = new Date(startTime.getTime() + (30 * 60 * 1000)); // 30 minutos de duración
+    // Usar la hora recibida tal cual (ya en formato HH:MM)
+    const hora24 = hora;
+    // Construir dateTime en formato local
+    const startDateTime = `${fecha}T${hora24}:00`;
+    const endDateTime = calcularFinEvento(startDateTime, 30); // 30 minutos después
 
     const event = {
       summary: `🚇 Entrega Metro CDMX - ${nombre}`,
@@ -100,11 +100,11 @@ Total: $${total}
 
 --- Reserva creada automáticamente ---`,
       start: {
-        dateTime: startTime.toISOString(),
+        dateTime: startDateTime,
         timeZone: 'America/Mexico_City',
       },
       end: {
-        dateTime: endTime.toISOString(),
+        dateTime: endDateTime,
         timeZone: 'America/Mexico_City',
       },
       location: `Estación ${estacion}, Metro CDMX`,
@@ -206,4 +206,20 @@ Total: $${total}
       details: error.message 
     });
   }
+}
+
+// Función para sumar minutos a un string dateTime local
+function calcularFinEvento(startDateTime, minutos) {
+  const [fecha, hora] = startDateTime.split('T');
+  const [h, m, s] = hora.split(':');
+  const date = new Date(`${fecha}T${hora}`);
+  date.setMinutes(date.getMinutes() + minutos);
+  // Formatear de vuelta a YYYY-MM-DDTHH:MM:SS
+  const yyyy = date.getFullYear();
+  const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+  const dd = date.getDate().toString().padStart(2, '0');
+  const hh = date.getHours().toString().padStart(2, '0');
+  const min = date.getMinutes().toString().padStart(2, '0');
+  const ss = date.getSeconds().toString().padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
 } 
