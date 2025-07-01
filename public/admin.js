@@ -171,10 +171,7 @@ function mostrarReservas(reservasAMostrar) {
                 <span class="status-${reserva.estado}">${estadoTexto}</span>
             </td>
             <td>
-                ${reserva.calendar_event_id ? 
-                    `<a href="https://calendar.google.com/calendar/event?eid=${reserva.calendar_event_id}" target="_blank" class="calendar-link">📅 Ver</a>` : 
-                    '❌ No creado'
-                }
+                ${reserva.calendar_event_id ? '📅' : '❌'}
             </td>
             <td>
                 ${getAccionesReserva(reserva)}
