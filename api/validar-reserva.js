@@ -49,65 +49,53 @@ export default async function handler(req, res) {
 
   const horasDisponibles = generarHorasDisponibles(estacionDeseada);
 
-  // 1. Obtener reservas existentes para la fecha con estado confirmado o pendiente
+  // Obtener todas las reservas del día ordenadas por hora ascendente
   const { data: reservas, error } = await supabase
     .from('reservas')
-    .select('estacion, hora')
+    .select('*')
     .eq('fecha', fecha)
-    .in('estado', ['pendiente', 'confirmado']);
-
+    .order('hora', { ascending: true });
   if (error) {
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
-  // 1. Validar empalme de hora/fecha (sin importar estación), excepto si es la misma estación
-  const empalme = reservas.find(r => r.hora === horaDeseada && r.fecha === fecha && r.estacion !== estacionDeseada);
+  // 1. Validar empalme exacto (misma fecha y hora, sin importar estación)
+  const empalme = reservas.find(r => r.hora === horaDeseada);
   if (empalme) {
     return res.status(200).json({
       disponible: false,
-      motivo: 'Empalme',
-      mensaje: '¡Ups! Ya hay una entrega programada a esa hora en otra estación. Por favor, elige otra.'
+      mensaje: '¡Ups! Ya hay una entrega programada a esa hora. Elige otra por favor.'
     });
   }
 
-  // 2. Validar conflictos por tiempo de llegada (Directions + 15 min)
+  // 2. Validar intervalo de tiempo entre entregas
   const [hNueva, mNueva] = horaDeseada.split(':').map(Number);
   const minutosNueva = hNueva * 60 + mNueva;
 
   for (const reserva of reservas) {
-    if (reserva.estacion === estacionDeseada && reserva.hora === horaDeseada) continue; // ya validado arriba
     const [hExist, mExist] = reserva.hora.split(':').map(Number);
     const minutosExist = hExist * 60 + mExist;
-    // Solo comparar reservas el mismo día
-    // Calcular tiempo de traslado real
-    const duracionTraslado = await calcularTraslado(reserva.estacion, estacionDeseada, estaciones);
-    // Si la nueva es después de la existente
+    // Solo comparar si la nueva es después de la existente
     if (minutosNueva > minutosExist) {
+      // Calcular tiempo de traslado real
+      const duracionTraslado = await calcularTraslado(reserva.estacion, estacionDeseada, estaciones);
       const tiempoMinimo = minutosExist + 15 + duracionTraslado;
       if (minutosNueva < tiempoMinimo) {
-        // Sugerir siguiente hora válida
-        const sugerida = sugerirSiguienteHoraValida(horasDisponibles, reservas, estacionDeseada, minutosExist, 15 + duracionTraslado);
         return res.status(200).json({
           disponible: false,
-          motivo: 'Traslado',
-          mensaje: `No hay tiempo suficiente para llegar desde la entrega anterior. Intenta a partir de las ${sugerida || 'otra hora'}.`,
-          horaSugerida: sugerida
+          mensaje: 'No es posible llegar a tiempo desde la entrega anterior. Elige una hora posterior.'
         });
       }
     }
-    // Si la nueva es antes de la existente
-    else if (minutosNueva < minutosExist) {
-      const tiempoMinimo = minutosNueva + 15 + duracionTraslado;
-      if (tiempoMinimo > minutosExist) {
-        const sugerida = sugerirSiguienteHoraValida(horasDisponibles, reservas, estacionDeseada, minutosExist, -(15 + duracionTraslado));
-        return res.status(200).json({
-          disponible: false,
-          motivo: 'Traslado',
-          mensaje: `No hay tiempo suficiente para llegar a la siguiente entrega. Intenta antes de las ${sugerida || 'otra hora'}.`,
-          horaSugerida: sugerida
-        });
-      }
-    }
+  }
+
+  // 3. (Opcional) Solo permitir intervalos de 30 minutos
+  const minutos = mNueva;
+  if (minutos !== 0 && minutos !== 30) {
+    return res.status(200).json({
+      disponible: false,
+      mensaje: 'Solo puedes reservar en intervalos de 30 minutos (ej: 9:00, 9:30, 10:00...)'
+    });
   }
 
   // Si todo bien
