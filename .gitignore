@@ -115,4 +115,7 @@ credentials.json
 .vercel
 
 # Platform specific
-render.yaml 
+render.yaml
+
+# Ignorar archivo de reglas locales
+project.rules 
