@@ -48,7 +48,18 @@ body {
   background: var(--primary-color);
   color: #fff;
   padding: 1.2rem 1rem 0.7rem 1rem;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 100%;
+}
+
+.header-title {
   text-align: center;
+  flex: 1;
 }
 
 .app-header h1 {
@@ -62,6 +73,27 @@ body {
   font-size: 1rem;
   font-weight: 400;
   letter-spacing: 0.5px;
+}
+
+.admin-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.admin-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
 }
 
 /* Navegación por pestañas */

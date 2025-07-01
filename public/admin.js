@@ -1,12 +1,56 @@
 // Variables globales
 let reservas = [];
 let estaciones = [];
+let tabActual = 'todas';
+let filtrosActivos = {};
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
     cargarReservas();
     cargarEstaciones();
+    configurarNavegacion();
 });
+
+// Configurar navegación por pestañas
+function configurarNavegacion() {
+    // Pestañas principales
+    const tabs = document.querySelectorAll('.admin-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-tab');
+            cambiarTab(tabName);
+        });
+    });
+
+    // Tarjetas de estadísticas
+    const statCards = document.querySelectorAll('.stat-card');
+    statCards.forEach(card => {
+        card.addEventListener('click', () => {
+            const tabName = card.getAttribute('data-tab');
+            cambiarTab(tabName);
+        });
+    });
+}
+
+// Cambiar pestaña activa
+function cambiarTab(tabName) {
+    tabActual = tabName;
+    
+    // Actualizar pestañas
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Actualizar tarjetas de estadísticas
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    document.querySelector(`.stat-card[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Mostrar reservas filtradas
+    mostrarReservasFiltradas();
+}
 
 // Cargar reservas
 async function cargarReservas() {
@@ -15,7 +59,7 @@ async function cargarReservas() {
         if (response.ok) {
             reservas = await response.json();
             actualizarEstadisticas();
-            mostrarReservas();
+            mostrarReservasFiltradas();
         } else {
             console.error('Error cargando reservas:', response.status);
         }
@@ -39,7 +83,7 @@ async function cargarEstaciones() {
 // Llenar filtro de estaciones
 function llenarFiltroEstaciones() {
     const select = document.getElementById('filter-estacion');
-    const estacionesUnicas = [...new Set(estaciones.map(e => e.nombre))];
+    const estacionesUnicas = [...new Set(estaciones.map(e => e.name))];
     
     estacionesUnicas.forEach(estacion => {
         const option = document.createElement('option');
@@ -51,29 +95,59 @@ function llenarFiltroEstaciones() {
 
 // Actualizar estadísticas
 function actualizarEstadisticas() {
-    const hoy = new Date().toISOString().split('T')[0];
-    
     const total = reservas.length;
-    const hoyCount = reservas.filter(r => r.fecha === hoy).length;
     const pendientes = reservas.filter(r => r.estado === 'pendiente').length;
     const completadas = reservas.filter(r => r.estado === 'completada').length;
+    const canceladas = reservas.filter(r => r.estado === 'cancelada').length;
     
     document.getElementById('total-reservas').textContent = total;
-    document.getElementById('reservas-hoy').textContent = hoyCount;
     document.getElementById('reservas-pendientes').textContent = pendientes;
     document.getElementById('reservas-completadas').textContent = completadas;
+    document.getElementById('reservas-canceladas').textContent = canceladas;
+}
+
+// Mostrar reservas filtradas según pestaña y filtros
+function mostrarReservasFiltradas() {
+    let reservasFiltradas = [...reservas];
+    
+    // Filtrar por pestaña
+    switch(tabActual) {
+        case 'pendientes':
+            reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'pendiente');
+            break;
+        case 'completadas':
+            reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'completada');
+            break;
+        case 'canceladas':
+            reservasFiltradas = reservasFiltradas.filter(r => r.estado === 'cancelada');
+            break;
+        case 'todas':
+        default:
+            // No filtrar por estado
+            break;
+    }
+    
+    // Aplicar filtros adicionales
+    if (filtrosActivos.estacion) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.estacion === filtrosActivos.estacion);
+    }
+    
+    if (filtrosActivos.fecha) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.fecha === filtrosActivos.fecha);
+    }
+    
+    mostrarReservas(reservasFiltradas);
 }
 
 // Mostrar reservas
-function mostrarReservas(reservasFiltradas = null) {
+function mostrarReservas(reservasAMostrar) {
     const tbody = document.getElementById('reservas-tbody');
-    const reservasAMostrar = reservasFiltradas || reservas;
     
     if (reservasAMostrar.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="no-reservas">
-                    No hay reservas para mostrar
+                <td colspan="10" class="no-reservas">
+                    No hay reservas para mostrar en esta categoría
                 </td>
             </tr>
         `;
@@ -90,27 +164,71 @@ function mostrarReservas(reservasFiltradas = null) {
             <td>${reserva.telefono}</td>
             <td>${reserva.estacion}</td>
             <td>${formatearFecha(reserva.fecha)}</td>
-            <td>${reserva.hora}</td>
+            <td>${formatearHora(reserva.hora)}</td>
             <td class="productos-list">${formatearProductos(reserva.productos)}</td>
             <td>
                 <span class="status-${reserva.estado}">${reserva.estado}</span>
             </td>
             <td>
-                ${reserva.estado === 'pendiente' ? 
-                    `<button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Completar</button>` : 
-                    `<button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>`
+                ${reserva.calendar_event_id ? 
+                    `<a href="https://calendar.google.com/calendar/event?eid=${reserva.calendar_event_id}" target="_blank" class="calendar-link">📅 Ver</a>` : 
+                    '❌ No creado'
                 }
-                <button class="btn btn-danger" onclick="eliminarReserva(${reserva.id})">🗑️ Eliminar</button>
+            </td>
+            <td>
+                ${getAccionesReserva(reserva)}
             </td>
         `;
         tbody.appendChild(row);
     });
 }
 
+// Obtener botones de acciones según el estado
+function getAccionesReserva(reserva) {
+    let acciones = '';
+    
+    switch(reserva.estado) {
+        case 'pendiente':
+            acciones = `
+                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Confirmar</button>
+                <button class="btn btn-warning" onclick="cambiarEstado(${reserva.id}, 'cancelada')">❌ Cancelar</button>
+            `;
+            break;
+        case 'completada':
+            acciones = `
+                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>
+                <button class="btn btn-warning" onclick="cambiarEstado(${reserva.id}, 'cancelada')">❌ Cancelar</button>
+            `;
+            break;
+        case 'cancelada':
+            acciones = `
+                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Pendiente</button>
+                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'completada')">✅ Confirmar</button>
+            `;
+            break;
+    }
+    
+    acciones += `<button class="btn btn-danger" onclick="eliminarReserva(${reserva.id})">🗑️ Eliminar</button>`;
+    return acciones;
+}
+
 // Formatear fecha
 function formatearFecha(fecha) {
     const [year, month, day] = fecha.split('-');
     return `${day}/${month}/${year}`;
+}
+
+// Formatear hora
+function formatearHora(hora) {
+    // Si es formato 24h, convertirlo a 12h
+    if (/^\d{2}:\d{2}$/.test(hora)) {
+        const [h, m] = hora.split(':');
+        const horas = parseInt(h);
+        const ampm = horas >= 12 ? 'PM' : 'AM';
+        const horas12 = horas > 12 ? horas - 12 : horas === 0 ? 12 : horas;
+        return `${horas12}:${m} ${ampm}`;
+    }
+    return hora;
 }
 
 // Formatear productos
@@ -131,24 +249,21 @@ function formatearProductos(productos) {
 // Aplicar filtros
 function aplicarFiltros() {
     const estacion = document.getElementById('filter-estacion').value;
-    const estado = document.getElementById('filter-status').value;
     const fecha = document.getElementById('filter-fecha').value;
     
-    let reservasFiltradas = [...reservas];
+    filtrosActivos = {};
+    if (estacion) filtrosActivos.estacion = estacion;
+    if (fecha) filtrosActivos.fecha = fecha;
     
-    if (estacion) {
-        reservasFiltradas = reservasFiltradas.filter(r => r.estacion === estacion);
-    }
-    
-    if (estado) {
-        reservasFiltradas = reservasFiltradas.filter(r => r.estado === estado);
-    }
-    
-    if (fecha) {
-        reservasFiltradas = reservasFiltradas.filter(r => r.fecha === fecha);
-    }
-    
-    mostrarReservas(reservasFiltradas);
+    mostrarReservasFiltradas();
+}
+
+// Limpiar filtros
+function limpiarFiltros() {
+    document.getElementById('filter-estacion').value = '';
+    document.getElementById('filter-fecha').value = '';
+    filtrosActivos = {};
+    mostrarReservasFiltradas();
 }
 
 // Cambiar estado de reserva
@@ -166,7 +281,7 @@ async function cambiarEstado(id, nuevoEstado) {
             if (reserva) {
                 reserva.estado = nuevoEstado;
                 actualizarEstadisticas();
-                mostrarReservas();
+                mostrarReservasFiltradas();
             }
         } else {
             console.error('Error cambiando estado:', response.status);
@@ -191,7 +306,7 @@ async function eliminarReserva(id) {
             // Remover la reserva local
             reservas = reservas.filter(r => r.id !== id);
             actualizarEstadisticas();
-            mostrarReservas();
+            mostrarReservasFiltradas();
         } else {
             console.error('Error eliminando reserva:', response.status);
         }
@@ -202,23 +317,21 @@ async function eliminarReserva(id) {
 
 // Exportar reservas a CSV
 function exportarReservas() {
-    const headers = ['ID', 'Cliente', 'Teléfono', 'Estación', 'Fecha', 'Hora', 'Productos', 'Estado', 'Fecha Creación'];
-    const csvContent = [
-        headers.join(','),
-        ...reservas.map(r => [
-            r.id,
-            `"${r.nombre}"`,
-            r.telefono,
-            `"${r.estacion}"`,
-            r.fecha,
-            r.hora,
-            `"${formatearProductos(r.productos)}"`,
-            r.estado,
-            r.fechaCreacion || ''
-        ].join(','))
-    ].join('\n');
+    const reservasAMostrar = obtenerReservasFiltradas();
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    if (reservasAMostrar.length === 0) {
+        alert('No hay reservas para exportar');
+        return;
+    }
+    
+    let csv = 'ID,Nombre,Teléfono,Estación,Fecha,Hora,Productos,Estado,Calendar Event ID\n';
+    
+    reservasAMostrar.forEach(reserva => {
+        const productos = formatearProductos(reserva.productos).replace(/"/g, '""');
+        csv += `"${reserva.id}","${reserva.nombre}","${reserva.telefono}","${reserva.estacion}","${reserva.fecha}","${reserva.hora}","${productos}","${reserva.estado}","${reserva.calendar_event_id || ''}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -229,5 +342,18 @@ function exportarReservas() {
     document.body.removeChild(link);
 }
 
-// Recargar datos cada 30 segundos
-setInterval(cargarReservas, 30000); 
+// Obtener reservas filtradas para exportación
+function obtenerReservasFiltradas() {
+    let reservasFiltradas = [...reservas];
+    
+    // Aplicar filtros activos
+    if (filtrosActivos.estacion) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.estacion === filtrosActivos.estacion);
+    }
+    
+    if (filtrosActivos.fecha) {
+        reservasFiltradas = reservasFiltradas.filter(r => r.fecha === filtrosActivos.fecha);
+    }
+    
+    return reservasFiltradas;
+} 
