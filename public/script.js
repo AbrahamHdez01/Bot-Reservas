@@ -315,7 +315,7 @@ function to24Hour(hora) {
 }
 
 // Crear reserva
-async function crearReserva() {
+async function crearReserva(horaForzada = null) {
     if (carrito.length === 0) {
         mostrarError('Agrega productos al carrito primero');
         return;
@@ -327,7 +327,7 @@ async function crearReserva() {
         telefono: formData.get('telefono'),
         estacion: formData.get('estacion'),
         fecha: formData.get('fecha'),
-        hora: to24Hour(formData.get('hora')),
+        hora: horaForzada || to24Hour(formData.get('hora')),
         productos: carrito
     };
 
@@ -378,6 +378,39 @@ async function crearReserva() {
     if (horaNum < horaInicio || horaNum > horaFin) {
         mostrarError(`Para la estación ${datos.estacion}, los horarios disponibles son de ${formatearHora(horaInicio)} a ${formatearHora(horaFin)}`);
         return;
+    }
+
+    // --- Validación de conflicto con backend ---
+    if (!horaForzada) {
+        try {
+            const validarResp = await fetch('/api/validar-reserva', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fecha: datos.fecha,
+                    horaDeseada: datos.hora,
+                    estacionDeseada: datos.estacion
+                })
+            });
+            const validarData = await validarResp.json();
+            if (!validarData.disponible) {
+                if (validarData.horaSugerida) {
+                    if (confirm(`${validarData.mensaje}\n¿Quieres reservar a las ${validarData.horaSugerida}?`)) {
+                        // Reintentar con la hora sugerida
+                        return crearReserva(validarData.horaSugerida);
+                    } else {
+                        mostrarError('Por favor elige otra hora.');
+                        return;
+                    }
+                } else {
+                    mostrarError(validarData.motivo || 'No hay horarios disponibles.');
+                    return;
+                }
+            }
+        } catch (e) {
+            mostrarError('No se pudo validar la disponibilidad. Intenta de nuevo.');
+            return;
+        }
     }
 
     try {
