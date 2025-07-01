@@ -491,6 +491,12 @@ async function crearReserva(horaForzada = null) {
         console.error('❌ Error general:', error);
         mostrarError('Error de conexión. Intenta de nuevo.');
     }
+
+    const btn = document.getElementById('confirmarReservaBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Reserva';
+    }
 }
 
 // Convertir hora formateada a número para validación

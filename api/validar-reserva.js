@@ -60,13 +60,13 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
-  // 1. Validar empalme exacto (misma estación, misma hora, misma fecha)
-  const empalme = reservas.find(r => r.hora === horaDeseada && r.estacion === estacionDeseada);
+  // 1. Validar empalme de hora/fecha (sin importar estación), excepto si es la misma estación
+  const empalme = reservas.find(r => r.hora === horaDeseada && r.fecha === fecha && r.estacion !== estacionDeseada);
   if (empalme) {
     return res.status(200).json({
       disponible: false,
       motivo: 'Empalme',
-      mensaje: '¡Ups! Ya hay una entrega programada a esa hora. Por favor, elige otra.'
+      mensaje: '¡Ups! Ya hay una entrega programada a esa hora en otra estación. Por favor, elige otra.'
     });
   }
 
