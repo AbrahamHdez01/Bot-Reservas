@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Reglas generales del proyecto de reservas metro CDMX
+
+[rules.general]
+description = "El sistema permite reservar entregas en estaciones del metro. Las reservas tienen lógica de tiempo, trayectos y tolerancia. Cada entrega debe ser posible en base al tiempo real estimado por Google Directions."
+
+[rules.validations]
+# No permitir duplicados exactos
+no_duplicate_time = "No se puede hacer una reserva si ya existe otra con la misma fecha y hora, sin importar la estación."
+
+# Solo bloques de media hora
+half_hour_blocks_only = "Las reservas solo pueden hacerse en bloques de 30 minutos exactos (por ejemplo: 8:30, 9:00, 9:30). Cualquier otro valor debe ser rechazado."
+
+# Tolerancia y Google Directions
+delivery_time_constraint = """
+Antes de permitir una reserva, verificar si se puede llegar desde la reserva anterior. 
+Esto se calcula como:
+  Tolerancia (15 min) + duración (en minutos) desde Directions API (modo transit).
+Si la hora de la nueva reserva es menor a (hora anterior + tolerancia + duración), debe rechazarse.
+"""
+
+[rules.api]
+endpoint = "/api/validar-reserva.js"
+logic = "Este endpoint valida nuevas reservas considerando horarios disponibles, duplicados, y tiempos de entrega entre estaciones usando la API de Google Directions."
+
+[rules.errors]
+error_overlap = "¡Ups! Ya hay una entrega programada a esa hora. Elige otra por favor."
+error_transit_conflict = "No es posible llegar a tiempo desde la entrega anterior. Elige una hora posterior."
+error_invalid_slot = "Solo puedes reservar en intervalos de 30 minutos (ej: 9:00, 9:30)."
+
+[rules.technologies]
+framework = "Next.js + Supabase + Google Maps API"
+edge_note = "Las API routes se ejecutan como funciones sin estado; no es posible usar WebSockets en Vercel directamente."
+
+[rules.notes]
+consider_day_only = "Toda la lógica se aplica únicamente a reservas del mismo día. No se considera historial de días previos o siguientes."
