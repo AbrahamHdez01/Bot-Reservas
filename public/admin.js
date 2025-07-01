@@ -186,25 +186,8 @@ function mostrarReservas(reservasAMostrar) {
 
 // Obtener botones de acciones según el estado
 function getAccionesReserva(reserva) {
-    let acciones = '';
-    
-    switch(reserva.estado) {
-        case 'pendiente':
-            acciones = `
-                <button class="btn btn-success" onclick="cambiarEstado(${reserva.id}, 'confirmado')">✅ Confirmar</button>
-                <button class="btn btn-warning" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>
-            `;
-            break;
-        case 'confirmado':
-            acciones = `
-                <button class="btn btn-primary" onclick="cambiarEstado(${reserva.id}, 'pendiente')">⏳ Por Confirmar</button>
-                <button class="btn btn-warning" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>
-            `;
-            break;
-    }
-    
-    acciones += `<button class="btn btn-danger" onclick="eliminarReserva(${reserva.id})">🗑️ Eliminar</button>`;
-    return acciones;
+    // Un solo botón para cancelar/eliminar
+    return `<button class="btn btn-danger" onclick="cancelarReserva(${reserva.id}, '${reserva.calendar_event_id || ''}')">❌ Cancelar</button>`;
 }
 
 // Formatear fecha
