@@ -13,7 +13,7 @@ const EARLY_STATIONS = [
   'mixcoac','san antonio','san pedro de los pinos','tacubaya','constituyentes','auditorio','polanco'
 ];
 
-const EXCLUDED_STATIONS = [
+const EXCLUDED_KEYWORDS = [
   'deportivo oceanía','romero rubio','ricardo flores magón','bosque de aragón','victoria','nezahualcóyotl','impulsora','rio de los remedios','muñoz','azteca','ciudad azteca','oceanía',
   'tezonco','olivos','nopalera','zapotitlán','tlaltenco','tláhuac',
   'peñón viejo','acatitla','santa marta','los reyes','la paz'
@@ -21,6 +21,10 @@ const EXCLUDED_STATIONS = [
 
 function normalizarEstacion(nombre){
   return nombre.toLowerCase().replace(/[\s\u2019']/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function contieneExcluida(nombreNorm){
+  return EXCLUDED_KEYWORDS.some(k=>nombreNorm.includes(k));
 }
 
 // Inicialización
@@ -234,7 +238,7 @@ async function cargarEstaciones() {
         const data = await response.json();
         
         // Filtrar estaciones según las reglas de negocio
-        estaciones = data.filter(estacion => estacion.available && !EXCLUDED_STATIONS.includes(normalizarEstacion(estacion.name)));
+        estaciones = data.filter(estacion => estacion.available && !contieneExcluida(normalizarEstacion(estacion.name)));
         llenarSelectEstaciones();
     } catch (error) {
         console.error('Error cargando estaciones:', error);
