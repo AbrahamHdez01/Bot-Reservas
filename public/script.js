@@ -83,6 +83,12 @@ async function cargarProductos() {
     try {
         const response = await fetch('/productos.json');
         productos = await response.json();
+        // Ordenar cada categoría alfabéticamente por nombre
+        for (const cat in productos) {
+            if (productos.hasOwnProperty(cat) && Array.isArray(productos[cat])) {
+                productos[cat].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+            }
+        }
         llenarSelectorCategorias();
     } catch (error) {
         console.error('Error cargando productos:', error);
@@ -112,7 +118,8 @@ function llenarSelectorProductos() {
     productos[categoria].forEach(producto => {
         const option = document.createElement('option');
         option.value = producto.id;
-        option.textContent = `${producto.nombre} ($${producto.precio})`;
+        const generoTxt = producto.genero ? ` (${producto.genero})` : '';
+        option.textContent = `${producto.nombre}${generoTxt}`;
         productoSelect.appendChild(option);
     });
 }
