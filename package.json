@@ -6,7 +6,10 @@
   "main": "index.html",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "setup-google": "node scripts/setup-google-calendar.js",
+    "refresh-token": "node scripts/refresh-google-token.js",
+    "test-calendar": "node api/test-calendar.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",

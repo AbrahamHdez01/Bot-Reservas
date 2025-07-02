@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { getGoogleCalendar, withTokenRetry } from '../lib/google-auth.js';
 import { supabase, handleSupabaseError } from '../lib/supabase.js';
 
 function to24Hour(hora) {
@@ -28,97 +28,59 @@ export default async function handler(req, res) {
   try {
     console.log('🔧 Iniciando creación de evento en Google Calendar...');
     
-    // Verificar que las variables de entorno estén configuradas
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REFRESH_TOKEN) {
-      console.error('❌ Variables de entorno de Google Calendar no configuradas');
-      console.log('Variables disponibles:', {
-        CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
-        CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
-        REFRESH_TOKEN: !!process.env.GOOGLE_REFRESH_TOKEN,
-        REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI
+    // Usar la función con renovación automática de tokens
+    const result = await withTokenRetry(async () => {
+      const calendar = await getGoogleCalendar();
+      
+      // Formatear productos para la descripción
+      const productosDesc = productos.map(p => `${p.nombre} (${p.cantidad}x $${p.precio})`).join('\n');
+      const total = productos.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
+
+      console.log('📅 Preparando evento...');
+
+      // Usar la hora recibida tal cual (ya en formato HH:MM)
+      const hora24 = hora;
+      // Construir dateTime en formato local
+      const startDateTime = `${fecha}T${hora24}:00`;
+      const endDateTime = calcularFinEvento(startDateTime, 30); // 30 minutos después
+
+      // Estado inicial
+      const estadoEvento = 'POR CONFIRMAR';
+
+      const event = {
+        summary: `🚇 Entrega Metro CDMX - ${estadoEvento} - ${nombre}`,
+        description: `Estado: ${estadoEvento}\nCliente: ${nombre}\nTeléfono: ${telefono}\nEstación: ${estacion}\nFecha: ${fecha}\nHora: ${hora}\n\nProductos:\n${productosDesc}\n\nTotal: $${total}\n\n--- Reserva creada automáticamente ---`,
+        start: {
+          dateTime: startDateTime,
+          timeZone: 'America/Mexico_City',
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: 'America/Mexico_City',
+        },
+        location: `Estación ${estacion}, Metro CDMX`,
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 }, // 1 día antes
+            { method: 'popup', minutes: 30 }, // 30 minutos antes
+          ],
+        },
+      };
+
+      console.log('🚀 Insertando evento en Google Calendar...');
+      console.log('Evento:', JSON.stringify(event, null, 2));
+
+      const response = await calendar.events.insert({
+        calendarId: 'primary',
+        resource: event,
       });
-      return res.status(500).json({ 
-        error: 'Configuración de Google Calendar incompleta',
-        details: 'Faltan las credenciales de Google Calendar'
-      });
-    }
 
-    console.log('✅ Variables de entorno verificadas');
+      console.log('✅ Evento creado exitosamente en Google Calendar:', response.data.id);
+      console.log('🔗 Link del evento:', response.data.htmlLink);
 
-    // Configurar OAuth2
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000'
-    );
-
-    console.log('🔐 Configurando credenciales OAuth2...');
-
-    // Usar refresh token para obtener access token
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+      return response;
     });
-
-    // Verificar que el access token se obtenga correctamente
-    try {
-      const accessToken = await oauth2Client.getAccessToken();
-      console.log('✅ Access token obtenido correctamente');
-    } catch (tokenError) {
-      console.error('❌ Error obteniendo access token:', tokenError);
-      return res.status(500).json({ 
-        error: 'Error de autenticación con Google',
-        details: 'No se pudo obtener el access token. Verifica el refresh token.'
-      });
-    }
-
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    // Formatear productos para la descripción
-    const productosDesc = productos.map(p => `${p.nombre} (${p.cantidad}x $${p.precio})`).join('\n');
-    const total = productos.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
-
-    console.log('📅 Preparando evento...');
-
-    // Usar la hora recibida tal cual (ya en formato HH:MM)
-    const hora24 = hora;
-    // Construir dateTime en formato local
-    const startDateTime = `${fecha}T${hora24}:00`;
-    const endDateTime = calcularFinEvento(startDateTime, 30); // 30 minutos después
-
-    // Estado inicial
-    const estadoEvento = 'POR CONFIRMAR';
-
-    const event = {
-      summary: `🚇 Entrega Metro CDMX - ${estadoEvento} - ${nombre}`,
-      description: `Estado: ${estadoEvento}\nCliente: ${nombre}\nTeléfono: ${telefono}\nEstación: ${estacion}\nFecha: ${fecha}\nHora: ${hora}\n\nProductos:\n${productosDesc}\n\nTotal: $${total}\n\n--- Reserva creada automáticamente ---`,
-      start: {
-        dateTime: startDateTime,
-        timeZone: 'America/Mexico_City',
-      },
-      end: {
-        dateTime: endDateTime,
-        timeZone: 'America/Mexico_City',
-      },
-      location: `Estación ${estacion}, Metro CDMX`,
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'email', minutes: 24 * 60 }, // 1 día antes
-          { method: 'popup', minutes: 30 }, // 30 minutos antes
-        ],
-      },
-    };
-
-    console.log('🚀 Insertando evento en Google Calendar...');
-    console.log('Evento:', JSON.stringify(event, null, 2));
-
-    const response = await calendar.events.insert({
-      calendarId: 'primary',
-      resource: event,
-    });
-
-    console.log('✅ Evento creado exitosamente en Google Calendar:', response.data.id);
-    console.log('🔗 Link del evento:', response.data.htmlLink);
 
     // Guardar reserva en Supabase
     console.log('💾 Guardando reserva en base de datos...');
@@ -128,10 +90,10 @@ export default async function handler(req, res) {
       telefono,
       estacion,
       fecha,
-      hora: hora24,
+      hora: to24Hour(hora),
       productos,
       estado: 'pendiente',
-      calendar_event_id: response.data.id
+      calendar_event_id: result.data.id
     };
 
     const { data: reserva, error: dbError } = await supabase
@@ -145,8 +107,8 @@ export default async function handler(req, res) {
       // Aunque falle la base de datos, el evento ya está en Google Calendar
       return res.status(200).json({
         success: true,
-        eventId: response.data.id,
-        eventLink: response.data.htmlLink,
+        eventId: result.data.id,
+        eventLink: result.data.htmlLink,
         message: 'Evento creado en Google Calendar, pero hubo un error guardando en la base de datos',
         dbError: handleSupabaseError(dbError)
       });
@@ -156,8 +118,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      eventId: response.data.id,
-      eventLink: response.data.htmlLink,
+      eventId: result.data.id,
+      eventLink: result.data.htmlLink,
       reservaId: reserva.id,
       message: 'Evento creado exitosamente en Google Calendar y reserva guardada'
     });
@@ -171,11 +133,18 @@ export default async function handler(req, res) {
       errors: error.errors
     });
     
-    // Manejar errores específicos de autenticación
-    if (error.code === 401) {
+    // Manejar errores específicos
+    if (error.message?.includes('Variables de entorno de Google Calendar no configuradas')) {
+      return res.status(500).json({ 
+        error: 'Configuración de Google Calendar incompleta',
+        details: 'Faltan las credenciales de Google Calendar'
+      });
+    }
+    
+    if (error.code === 401 || error.message?.includes('invalid_grant')) {
       return res.status(500).json({ 
         error: 'Error de autenticación con Google Calendar',
-        details: 'El refresh token puede haber expirado. Necesitas generar uno nuevo.'
+        details: 'Los tokens han expirado. Se intentó renovar automáticamente pero falló. Contacta al administrador.'
       });
     }
     
