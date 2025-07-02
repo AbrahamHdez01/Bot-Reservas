@@ -38,7 +38,7 @@ export default async function handler(req,res){
   const end = horaToMinutes('17:00');
   const slots=[];
 
-  for(let min=start;min<=end;min+=30){
+  for(let min=start;min<=end;min+=15){
     const h=Math.floor(min/60);const m=min%60;
     const hora= `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
     const result=await checkDisponibilidad({fecha,horaDeseada:hora,estacionDeseada:estacion});
