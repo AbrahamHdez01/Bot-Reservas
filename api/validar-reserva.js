@@ -14,8 +14,8 @@ function horaToMinutes(hora) {
   if (!hora) return NaN;
   hora = hora.trim();
 
-  // Formato 24h HH:MM
-  const match24 = hora.match(/^(\d{1,2}):(\d{2})$/);
+  // Formato 24h HH:MM o HH:MM:SS
+  const match24 = hora.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (match24) {
     const h = parseInt(match24[1], 10);
     const m = parseInt(match24[2], 10);
@@ -299,12 +299,10 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
 
   // 🚨 BLOQUEO ESTRICTO: No permitir ninguna reserva en la misma hora (sin importar estación)
   for (const r of reservas) {
-    if (horaToMinutes(r.hora) === horaToMinutes(horaDeseada)) {
-      console.log('❌ Ya existe reserva a esta hora:', r.hora, 'en', r.estacion, '- Nueva solicitud:', horaDeseada, 'en', estacionDeseada);
-      return {
-        disponible: false,
+    if (horaToMinutes(r.hora) === minutosDeseados) {
+      return res.status(400).json({
         error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
-      };
+      });
     }
   }
 
