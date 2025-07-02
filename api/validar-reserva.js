@@ -20,14 +20,101 @@ function minutesToHora(min) {
 
 // Llama a Google Directions API y devuelve duración en minutos
 async function calcularDuracionMaps(origen, destino) {
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origen)}&destination=${encodeURIComponent(destino)}&mode=transit&key=${GOOGLE_MAPS_API_KEY}`;
-  const resp = await fetch(url);
-  const data = await resp.json();
-  if (data.status === 'OK' && data.routes[0]?.legs[0]?.duration?.value) {
-    return Math.ceil(data.routes[0].legs[0].duration.value / 60);
+  if (!GOOGLE_MAPS_API_KEY) {
+    console.log('⚠️  No hay API key de Google Maps, usando fallback de 40 min');
+    return 40;
   }
-  // Si falla, asumir 30 min por defecto
-  return 30;
+
+  // Limpiar nombres de estaciones para que sean más simples
+  const limpiarNombre = (estacion) => {
+    return estacion
+      .replace(', Ciudad de México, CDMX, México', '')
+      .replace(', Naucalpan de Juárez, Méx., México', '')
+      .replace(', Estado de México, México', '')
+      .replace('/Tenochtitlan', '')
+      .replace('/Lagunilla', '')
+      .replace('/Arena Ciudad de México', '')
+      .replace('/Derechos Humanos', '')
+      .replace('/Plaza de la Transparencia', '')
+      .replace('/Basílica', '')
+      .replace('-Basílica', '')
+      .trim();
+  };
+
+  const origenLimpio = limpiarNombre(origen);
+  const destinoLimpio = limpiarNombre(destino);
+  
+  console.log('🗺️  Calculando ruta Metro CDMX:');
+  console.log('   Origen:', origenLimpio);
+  console.log('   Destino:', destinoLimpio);
+  
+  // Si es la misma estación, tiempo mínimo
+  if (origenLimpio === destinoLimpio) {
+    console.log('✅ Misma estación, tiempo: 5 minutos');
+    return 5;
+  }
+  
+  // Intentar múltiples formatos para obtener el tiempo más preciso
+  const intentos = [
+    // Formato 1: Estación específica de Metro CDMX
+    {
+      origen: `Estación ${origenLimpio}, Metro Ciudad de México`,
+      destino: `Estación ${destinoLimpio}, Metro Ciudad de México`,
+      descripcion: 'Formato específico Metro CDMX'
+    },
+    // Formato 2: Con "Metro" al inicio
+    {
+      origen: `Metro ${origenLimpio}, CDMX`,
+      destino: `Metro ${destinoLimpio}, CDMX`,
+      descripcion: 'Formato Metro + nombre'
+    },
+    // Formato 3: Nombres simples con Ciudad de México
+    {
+      origen: `${origenLimpio}, Ciudad de México`,
+      destino: `${destinoLimpio}, Ciudad de México`,
+      descripcion: 'Nombres simples + CDMX'
+    }
+  ];
+  
+  for (let i = 0; i < intentos.length; i++) {
+    const intento = intentos[i];
+    console.log(`📡 Intento ${i + 1}: ${intento.descripcion}`);
+    
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(intento.origen)}&destination=${encodeURIComponent(intento.destino)}&mode=transit&transit_mode=subway&departure_time=now&region=mx&language=es&key=${GOOGLE_MAPS_API_KEY}`;
+      
+      const resp = await fetch(url);
+      const data = await resp.json();
+      
+      console.log(`   Status: ${data.status}`);
+      
+      if (data.status === 'OK' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        if (route.legs && route.legs.length > 0 && route.legs[0].duration) {
+          const duracionSegundos = route.legs[0].duration.value;
+          const duracionMinutos = Math.ceil(duracionSegundos / 60);
+          
+          // Para Metro CDMX, aplicar límites realistas
+          const duracionFinal = Math.max(Math.min(duracionMinutos, 90), 8); // Entre 8 y 90 min
+          
+          console.log(`✅ ¡ÉXITO! Duración obtenida: ${duracionMinutos} min (ajustada: ${duracionFinal} min)`);
+          console.log(`   Ruta encontrada con: ${intento.descripcion}`);
+          return duracionFinal;
+        }
+      }
+      
+      if (data.error_message) {
+        console.log(`   Error: ${data.error_message}`);
+      }
+      
+    } catch (error) {
+      console.log(`   Error en intento ${i + 1}:`, error.message);
+    }
+  }
+  
+  // Si todos los intentos fallan, usar tiempo estimado conservador
+  console.log('⚠️  Todos los intentos fallaron, usando estimado conservador de 35 min');
+  return 35;
 }
 
 // Solo permite horas en :00 o :30
