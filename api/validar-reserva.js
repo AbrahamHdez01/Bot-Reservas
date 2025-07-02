@@ -42,12 +42,15 @@ export default async function handler(req, res) {
   }
 
   const { fecha, horaDeseada, estacionDeseada } = req.body;
+  console.log('🔍 Validando reserva:', { fecha, horaDeseada, estacionDeseada });
+  
   if (!fecha || !horaDeseada || !estacionDeseada) {
     return res.status(400).json({ error: 'Faltan datos' });
   }
 
   // 3. Validar intervalos de 30 minutos
   if (!esHoraValida(horaDeseada)) {
+    console.log('❌ Hora no válida (no es :00 o :30):', horaDeseada);
     return res.status(400).json({
       error: 'Solo puedes reservar en intervalos de 30 minutos (ej: 9:00, 9:30).',
     });
@@ -70,15 +73,23 @@ export default async function handler(req, res) {
     .from('reservas')
     .select('*')
     .eq('fecha', fecha)
+    .in('estado', ['pendiente', 'confirmado'])
     .order('hora', { ascending: true });
   if (error) {
+    console.error('❌ Error consultando reservas:', error);
     return res.status(500).json({ error: 'Error consultando reservas' });
   }
 
+  console.log('📋 Reservas existentes para', fecha, ':', reservas.length, 'reservas');
+  reservas.forEach(r => console.log('  -', r.hora, r.estacion, r.estado));
+
   const minutosDeseados = horaToMinutes(horaDeseada);
+  console.log('⏰ Minutos deseados:', minutosDeseados, '(', horaDeseada, ')');
 
   // 1. Bloquear si ya existe una reserva a la misma hora/fecha (sin importar estación)
-  if (reservas.some(r => horaToMinutes(r.hora) === minutosDeseados)) {
+  const reservaEnMismaHora = reservas.find(r => horaToMinutes(r.hora) === minutosDeseados);
+  if (reservaEnMismaHora) {
+    console.log('❌ Empalme detectado con reserva:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion);
     return res.status(400).json({
       error: '¡Ups! Ya hay una entrega programada a esa hora. Elige otra por favor.'
     });
@@ -89,17 +100,32 @@ export default async function handler(req, res) {
     .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
     .filter(r => r.min < minutosDeseados);
 
+  console.log('📅 Reservas previas:', reservasPrevias.length);
+  reservasPrevias.forEach(r => console.log('  -', r.hora, r.estacion, '(', r.min, 'min)'));
+
   if (reservasPrevias.length > 0) {
     // Tomar la reserva previa más cercana
     const reservaAnterior = reservasPrevias[reservasPrevias.length - 1];
+    console.log('🚇 Calculando traslado desde:', reservaAnterior.estacion, 'hacia:', estacionDeseada);
+    
     const duracionMin = await calcularDuracionMaps(reservaAnterior.estacion, estacionDeseada);
     const margen = 15 + duracionMin;
-    if (minutosDeseados < reservaAnterior.min + margen) {
+    const tiempoMinimoRequerido = reservaAnterior.min + margen;
+    
+    console.log('⏱️  Duración traslado:', duracionMin, 'min');
+    console.log('⏱️  Margen total:', margen, 'min (15 + ' + duracionMin + ')');
+    console.log('⏱️  Tiempo mínimo requerido:', tiempoMinimoRequerido, 'min');
+    console.log('⏱️  Tiempo deseado:', minutosDeseados, 'min');
+    console.log('⏱️  ¿Es válido?', minutosDeseados >= tiempoMinimoRequerido);
+    
+    if (minutosDeseados < tiempoMinimoRequerido) {
+      console.log('❌ No hay tiempo suficiente para traslado');
       return res.status(400).json({
         error: 'No es posible llegar a tiempo desde la entrega anterior. Elige una hora posterior.'
       });
     }
   }
 
+  console.log('✅ Validación exitosa - reserva permitida');
   return res.status(200).json({ ok: true });
 } 
