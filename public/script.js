@@ -5,12 +5,34 @@ let estaciones = [];
 
 // Lista de estaciones cuyo horario inicia 08:30
 const EARLY_STATIONS = [
-  // Línea 8 (Constitución de 1917 ↔ Santa Anita)
-  'constitución de 1917','uam-i','cerro de la estrella','iztapalapa','atlalilco','escuadrón 201','aculco','apatlaco','iztacalco','coyuya','santa anita',
-  // Línea 12 (Periférico Oriente ↔ Atlalilco)
-  'periférico oriente','calle 11','lomas estrella','san andrés tomatlán','culhuacán','atlalilco',
-  // Línea 7 (Mixcoac ↔ Polanco)
-  'mixcoac','san antonio','san pedro de los pinos','tacubaya','constituyentes','auditorio','polanco'
+  // Línea 8 · Constitución ↔ Santa Anita
+  "Constitución de 1917, Ciudad de México, CDMX, México",
+  "UAM-I, Ciudad de México, CDMX, México",
+  "Cerro de la Estrella, Ciudad de México, CDMX, México",
+  "Iztapalapa, Ciudad de México, CDMX, México",
+  "Atlalilco, Ciudad de México, CDMX, México",
+  "Escuadrón 201, Ciudad de México, CDMX, México",
+  "Aculco, Ciudad de México, CDMX, México",
+  "Apatlaco, Ciudad de México, CDMX, México",
+  "Iztacalco, Ciudad de México, CDMX, México",
+  "Coyuya, Ciudad de México, CDMX, México",
+  "Santa Anita, Ciudad de México, CDMX, México",
+
+  // Línea 12 · Periférico Oriente ↔ Atlalilco
+  "Periférico Oriente, Ciudad de México, CDMX, México",
+  "Calle 11, Ciudad de México, CDMX, México",
+  "Lomas Estrella, Ciudad de México, CDMX, México",
+  "San Andrés Tomatlán, Ciudad de México, CDMX, México",
+  "Culhuacán, Ciudad de México, CDMX, México",
+
+  // Línea 7 · Mixcoac ↔ Polanco
+  "Mixcoac, Ciudad de México, CDMX, México",
+  "San Antonio, Ciudad de México, CDMX, México",
+  "San Pedro de los Pinos, Ciudad de México, CDMX, México",
+  "Tacubaya, Ciudad de México, CDMX, México",
+  "Constituyentes, Ciudad de México, CDMX, México",
+  "Auditorio, Ciudad de México, CDMX, México",
+  "Polanco, Ciudad de México, CDMX, México"
 ];
 
 const EXCLUDED_KEYWORDS = [
@@ -25,6 +47,13 @@ function normalizarEstacion(nombre){
 
 function contieneExcluida(nombreNorm){
   return EXCLUDED_KEYWORDS.some(k=>nombreNorm.includes(k));
+}
+
+function normalizeName(n){return n.toLowerCase().replace(/[\s\u2019']/g,' ').replace(/\s+/g,' ').trim();}
+
+function isEarlyStation(nombre){
+  const norm=normalizeName(nombre);
+  return EARLY_STATIONS.some(s=>normalizeName(s)===norm);
 }
 
 // Inicialización
@@ -316,7 +345,7 @@ async function llenarHorasDisponibles() {
     let horaFin = 17; // 5 pm
     
     // Ajustar hora de inicio según lista
-    if (EARLY_STATIONS.includes(normalizarEstacion(estacion))) {
+    if (isEarlyStation(estacion)) {
         horaInicio = 8.5; // 8:30 am
     }
 
@@ -434,7 +463,7 @@ async function crearReserva(horaForzada = null) {
     let horaFin = 17;
     
     // Ajustar hora de inicio según lista
-    if (EARLY_STATIONS.includes(normalizarEstacion(estacion))) {
+    if (isEarlyStation(estacion)) {
         horaInicio = 8.5; // 8:30 am
     }
 

@@ -165,9 +165,8 @@ function incluyeKeywordExcluido(nombreNorm){
   return EXCLUDED_KEYWORDS.some(k=>nombreNorm.includes(k));
 }
 
-function normalizarEstacion(nombre) {
-  return nombre.toLowerCase().replace(/[\s\u2019']/g, ' ').replace(/\s+/g, ' ').trim();
-}
+function normalizeName(n){return n.toLowerCase().replace(/[\s\u2019']/g,' ').replace(/\s+/g,' ').trim();}
+const isEarlyStation = (n)=>EARLY_STATIONS.has([...EARLY_STATIONS].find(s=>normalizeName(s)===normalizeName(n))||'');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -220,8 +219,8 @@ export default async function handler(req, res) {
   console.log('⏰ Minutos deseados:', minutosDeseados, '(', horaDeseada, ')');
 
   // 0. Validar que la estación esté permitida y horario temprano
-  const estacionNormalizada = normalizarEstacion(estacionDeseada);
-  const estacionObj = estaciones.find(e => normalizarEstacion(e.name).includes(estacionNormalizada));
+  const estacionNormalizada = normalizeName(estacionDeseada);
+  const estacionObj = estaciones.find(e => normalizeName(e.name).includes(estacionNormalizada));
   if (incluyeKeywordExcluido(estacionNormalizada)) {
     return res.status(200).json({
       disponible: false,
@@ -230,7 +229,7 @@ export default async function handler(req, res) {
   }
 
   // Restringir reservas antes de 08:30 en estaciones de ciertos rangos
-  if (minutosDeseados < EARLY_START_MINUTES && EARLY_STATIONS.has(estacionDeseada.trim())) {
+  if (minutosDeseados < EARLY_START_MINUTES && isEarlyStation(estacionDeseada)) {
     // Early station antes de 08:30 → no permitido (debe ser >= 08:30)
     return res.status(200).json({
       disponible: false,
@@ -239,7 +238,7 @@ export default async function handler(req, res) {
   }
 
   // Para estaciones fuera de la lista, bloquear horas antes de 10:00
-  if (minutosDeseados < horaToMinutes('10:00') && !EARLY_STATIONS.has(estacionDeseada.trim())) {
+  if (minutosDeseados < horaToMinutes('10:00') && !isEarlyStation(estacionDeseada)) {
     return res.status(200).json({
       disponible: false,
       error: 'Las entregas en esta estación inician a partir de las 10:00.'
