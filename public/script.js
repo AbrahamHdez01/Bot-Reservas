@@ -366,19 +366,20 @@ async function llenarHorasDisponibles() {
         // Si falla, no bloquea ninguna hora
     }
 
-    try{
-      const resp=await fetch(`/api/horas-disponibles?fecha=${fechaInput.value}&estacion=${encodeURIComponent(estacion)}`);
-      if(resp.ok){
-        const {horas}=await resp.json();
-        horas.forEach(h=>{
-          const option=document.createElement('option');
-          option.value=h;
-          option.textContent=h;
-          horaSelect.appendChild(option);
-        });
-      }
-    }catch(e){
-      console.error('Error cargando horas disponibles',e);
+    // Generar todos los slots locales (15 minutos) independientemente de la disponibilidad.
+    for (let hora = horaInicio; hora <= horaFin; hora += 0.25) {
+        const minutos = (hora % 1) * 60;
+        if (![0,15,30,45].includes(minutos)) continue;
+        const horaFormateada = formatearHora(hora);
+        const hora24 = to24Hour(horaFormateada);
+
+        // Bloquea solo horas donde YA existe reserva en OTRA estación
+        if (!horasOcupadasOtrasEstaciones.includes(hora24)) {
+            const option = document.createElement('option');
+            option.value = hora24;
+            option.textContent = horaFormateada;
+            horaSelect.appendChild(option);
+        }
     }
 }
 
