@@ -173,14 +173,24 @@ export default async function handler(req, res) {
   const minutosDeseados = horaToMinutes(horaDeseada);
   console.log('⏰ Minutos deseados:', minutosDeseados, '(', horaDeseada, ')');
 
-  // 1. Bloquear si ya existe una reserva a la misma hora/fecha (sin importar estación)
+  // 1. Validar empalme - Permitir múltiples reservas en la misma estación/hora/fecha
   const reservaEnMismaHora = reservas.find(r => horaToMinutes(r.hora) === minutosDeseados);
   if (reservaEnMismaHora) {
-    console.log('❌ Empalme detectado con reserva:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion);
-    return res.status(200).json({
-      disponible: false,
-      error: 'Ya hay otra reservación a esa hora. Por favor elige otro horario.'
-    });
+    // Comparar estaciones de forma case-insensitive y normalizada
+    const estacionExistente = reservaEnMismaHora.estacion.toLowerCase().trim();
+    const estacionNueva = estacionDeseada.toLowerCase().trim();
+    
+    if (estacionExistente === estacionNueva) {
+      console.log('✅ Misma estación, hora y fecha - Permitido para múltiples entregas');
+      console.log('   Reserva existente:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion);
+      console.log('   Nueva reserva:', horaDeseada, estacionDeseada);
+    } else {
+      console.log('❌ Empalme detectado en diferente estación:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion, 'vs', estacionDeseada);
+      return res.status(200).json({
+        disponible: false,
+        error: 'Ya hay otra reservación a esa hora en una estación diferente. Por favor elige otro horario.'
+      });
+    }
   }
 
   // 2. Validar traslado solo desde la reserva previa más cercana

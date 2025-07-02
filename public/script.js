@@ -293,15 +293,18 @@ async function llenarHorasDisponibles() {
         horaInicio = 8.5; // 8:30 am
     }
 
-    // Consultar reservas ocupadas para la fecha (TODAS las estaciones, no solo la seleccionada)
-    let horasOcupadas = [];
+    // Consultar reservas ocupadas para la fecha - Bloquear solo las de diferentes estaciones
+    let horasOcupadasOtrasEstaciones = [];
     try {
         const resp = await fetch(`/api/reservas?fecha=${fechaInput.value}`);
         if (resp.ok) {
             const reservasFecha = await resp.json();
-            // Filtrar solo reservas activas (pendiente y confirmado)
-            const reservasActivas = reservasFecha.filter(r => r.estado === 'pendiente' || r.estado === 'confirmado');
-            horasOcupadas = reservasActivas.map(r => to24Hour(r.hora));
+            // Filtrar reservas activas (pendiente y confirmado) en DIFERENTES estaciones
+            const reservasOtrasEstaciones = reservasFecha.filter(r => 
+                (r.estado === 'pendiente' || r.estado === 'confirmado') && 
+                r.estacion.toLowerCase().trim() !== estacion.toLowerCase().trim()
+            );
+            horasOcupadasOtrasEstaciones = reservasOtrasEstaciones.map(r => to24Hour(r.hora));
         }
     } catch (e) {
         // Si falla, no bloquea ninguna hora
@@ -313,7 +316,10 @@ async function llenarHorasDisponibles() {
         if (minutos !== 0 && minutos !== 15 && minutos !== 30 && minutos !== 45) continue; // Solo :00, :15, :30 y :45
         const horaFormateada = formatearHora(hora);
         const hora24 = to24Hour(horaFormateada);
-        if (!horasOcupadas.includes(hora24)) {
+        
+        // Solo bloquear si hay reserva en DIFERENTE estación a esa hora
+        // Permitir si la reserva existente es en la MISMA estación
+        if (!horasOcupadasOtrasEstaciones.includes(hora24)) {
             const option = document.createElement('option');
             option.value = horaFormateada;
             option.textContent = horaFormateada;
