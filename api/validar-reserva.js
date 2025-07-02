@@ -123,6 +123,22 @@ function esHoraValida(hora) {
   return m === 0 || m === 15 || m === 30 || m === 45;
 }
 
+// Agregar configuraciones de rango/horario y exclusiones
+const EARLY_RESTRICTED_STATIONS = new Set([
+  // Línea 8 – Constitución de 1917 → Santa Anita
+  'constitución de 1917', 'uam-i', 'cerro de la estrella', 'iztapalapa', 'atlalilco', 'escuadrón 201', 'aculco', 'apatlaco', 'iztacalco', 'coyuya', 'santa anita',
+  // Línea 12 – Periférico Oriente → Atlalilco
+  'periférico oriente', 'calle 11', 'lomas estrella', 'san andrés tomatlán', 'culhuacán', 'atlalilco',
+  // Línea 7 – Mixcoac → Polanco
+  'mixcoac', 'san antonio', 'san pedro de los pinos', 'tacubaya', 'constituyentes', 'auditorio', 'polanco'
+]);
+
+const EARLY_START_MINUTES = horaToMinutes('08:30');
+
+function normalizarEstacion(nombre) {
+  return nombre.toLowerCase().replace(/[\s\u2019']/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
@@ -172,6 +188,24 @@ export default async function handler(req, res) {
 
   const minutosDeseados = horaToMinutes(horaDeseada);
   console.log('⏰ Minutos deseados:', minutosDeseados, '(', horaDeseada, ')');
+
+  // 0. Validar que la estación esté permitida y horario temprano
+  const estacionNormalizada = normalizarEstacion(estacionDeseada);
+  const estacionObj = estaciones.find(e => normalizarEstacion(e.name).includes(estacionNormalizada));
+  if (estacionObj && estacionObj.available === false) {
+    return res.status(200).json({
+      disponible: false,
+      error: 'En esta estación no se realizan entregas.'
+    });
+  }
+
+  // Restringir reservas antes de 08:30 en estaciones de ciertos rangos
+  if (horaToMinutes(horaDeseada) < EARLY_START_MINUTES && EARLY_RESTRICTED_STATIONS.has(estacionNormalizada)) {
+    return res.status(200).json({
+      disponible: false,
+      error: 'Para esta estación las entregas inician a partir de las 08:30.'
+    });
+  }
 
   // 1. Validar empalme - Permitir múltiples reservas en la misma estación/hora/fecha
   const reservaEnMismaHora = reservas.find(r => horaToMinutes(r.hora) === minutosDeseados);
