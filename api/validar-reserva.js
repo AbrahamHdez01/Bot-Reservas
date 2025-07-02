@@ -29,6 +29,16 @@ function horaToMinutes(hora) {
     return h * 60 + m;
   }
 
+  // Formato 12h sin minutos ej '10am'
+  const match12simple = hora.match(/^(\d{1,2})\s*(am|pm)$/i);
+  if(match12simple){
+     let h=parseInt(match12simple[1],10);
+     const ampm=match12simple[2].toUpperCase();
+     if(ampm==='PM'&&h!==12) h+=12;
+     if(ampm==='AM'&&h===12) h=0;
+     return h*60;
+  }
+
   console.warn('horaToMinutes: formato no reconocido', hora);
   return NaN;
 }
