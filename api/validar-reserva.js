@@ -297,87 +297,86 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     };
   }
 
-  // 4️⃣ Empalme exacto — versión robusta
+  // 4️⃣ EMPALME EXACTO - Bloquear duplicados exactos (misma hora + misma estación)
   for (const r of reservas) {
-    if (horaToMinutes(r.hora) === horaToMinutes(horaDeseada)) {
-      if (r.estacion !== estacionDeseada) {
-        console.log('❌ Empalme detectado:', r.hora, r.estacion, 'vs', horaDeseada, estacionDeseada);
-        return {
-          disponible: false,
-          error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
-        };
-      }
-      // misma estación → se permite, pero la ignoramos al checar márgenes
-      console.log('✅ Misma estación permitida:', r.hora, r.estacion);
+    if (horaToMinutes(r.hora) === horaToMinutes(horaDeseada) &&
+        r.estacion === estacionDeseada) {
+      console.log('❌ Duplicado exacto detectado:', r.hora, r.estacion);
+      return {
+        disponible: false,
+        error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
+      };
     }
   }
 
-  // 🔧 Filtrar reservas idénticas para cálculo de márgenes
-  const reservasFiltradas = reservas.filter(
+  // 5️⃣ LISTA SIN DUPLICADOS IDÉNTICOS para cálculo de horarios intermedios
+  const efectivas = reservas.filter(
     r => !(horaToMinutes(r.hora) === horaToMinutes(horaDeseada) &&
            r.estacion === estacionDeseada)
   );
 
-  // 5️⃣ Validar margen ANTERIOR usando reservas filtradas
-  const reservasPrevias = reservasFiltradas
-    .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
-    .filter(r => r.min < minutosDeseados);
+  const tNueva = minutosDeseados;
+  console.log('🕐 Validando horario intermedio para t =', tNueva, 'min');
 
-  console.log('📅 Reservas previas (filtradas):', reservasPrevias.length);
-  reservasPrevias.forEach(r => console.log('  -', r.hora, r.estacion, '(', r.min, 'min)'));
+  // 6️⃣ CALCULAR PREV / NEXT sobre reservas efectivas
+  const efectivasConMinutos = efectivas.map(r => ({ ...r, min: horaToMinutes(r.hora) }));
+  const idx = efectivasConMinutos.findIndex(r => r.min > tNueva);
+  const prev = idx > 0 ? efectivasConMinutos[idx - 1] : null;
+  const next = idx >= 0 ? efectivasConMinutos[idx] : null;
 
-  if (reservasPrevias.length > 0) {
-    const reservaAnterior = reservasPrevias[reservasPrevias.length - 1];
-    console.log('🚇 Calculando margen desde ANTERIOR:', reservaAnterior.estacion, '→', estacionDeseada);
+  console.log('📍 Posición de inserción:');
+  console.log('   Anterior:', prev ? `${prev.hora} en ${prev.estacion} (${prev.min} min)` : 'ninguna');
+  console.log('   Siguiente:', next ? `${next.hora} en ${next.estacion} (${next.min} min)` : 'ninguna');
+
+  // 7️⃣ FUNCIÓN gapOK - Validar márgenes bidireccionales
+  async function gapOK(prev, next) {
+    console.log('🔍 Validando gaps bidireccionales...');
     
-    const duracionMin = await calcularDuracionMaps(reservaAnterior.estacion, estacionDeseada);
-    const margen = 15 + duracionMin;
-    const tiempoMinimoRequerido = reservaAnterior.min + margen;
-    
-    console.log('⏱️  Duración traslado:', duracionMin, 'min');
-    console.log('⏱️  Margen total:', margen, 'min (15 + ' + duracionMin + ')');
-    console.log('⏱️  Tiempo mínimo requerido:', tiempoMinimoRequerido, 'min');
-    console.log('⏱️  Tiempo deseado:', minutosDeseados, 'min');
-    console.log('⏱️  ¿Es válido?', minutosDeseados >= tiempoMinimoRequerido);
-    
-    if (minutosDeseados < tiempoMinimoRequerido) {
-      console.log('❌ No hay tiempo suficiente para traslado desde anterior');
-      return {
-        disponible: false,
-        error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
-      };
+    // Validar margen desde ANTERIOR
+    if (prev) {
+      console.log('⏪ Verificando gap desde anterior:', prev.estacion, '→', estacionDeseada);
+      const durPrev = await calcularDuracionMaps(prev.estacion, estacionDeseada);
+      const needPrev = 15 + durPrev;
+      const gapPrev = tNueva - prev.min;
+      
+      console.log(`   Duración: ${durPrev} min | Necesario: ${needPrev} min | Gap disponible: ${gapPrev} min`);
+      
+      if (gapPrev < needPrev) {
+        console.log('❌ Gap insuficiente desde anterior');
+        return false;
+      }
     }
+    
+    // Validar margen hacia SIGUIENTE  
+    if (next) {
+      console.log('⏩ Verificando gap hacia siguiente:', estacionDeseada, '→', next.estacion);
+      const durNext = await calcularDuracionMaps(estacionDeseada, next.estacion);
+      const needNext = 15 + durNext;
+      const gapNext = next.min - tNueva;
+      
+      console.log(`   Duración: ${durNext} min | Necesario: ${needNext} min | Gap disponible: ${gapNext} min`);
+      
+      if (gapNext < needNext) {
+        console.log('❌ Gap insuficiente hacia siguiente');
+        return false;
+      }
+    }
+    
+    console.log('✅ Ambos gaps son suficientes');
+    return true;
   }
 
-  // 6️⃣ Validar margen SIGUIENTE usando reservas filtradas
-  const reservasPosteriores = reservasFiltradas
-    .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
-    .filter(r => r.min > minutosDeseados);
-
-  if (reservasPosteriores.length > 0) {
-    const siguiente = reservasPosteriores[0]; // ya vienen ordenadas asc
-    console.log('🚇 Calculando margen hacia SIGUIENTE:', estacionDeseada, '→', siguiente.estacion);
-
-    const duracionMin = await calcularDuracionMaps(estacionDeseada, siguiente.estacion);
-    const margen = 15 + duracionMin;
-    const tiempoNecesario = minutosDeseados + margen;
-
-    console.log('⏱️  Duración traslado (hacia siguiente):', duracionMin, 'min');
-    console.log('⏱️  Margen total:', margen, 'min (15 + ' + duracionMin + ')');
-    console.log('⏱️  Próxima reserva:', siguiente.hora, '(', siguiente.min, 'min)');
-    console.log('⏱️  Tiempo necesario:', tiempoNecesario, 'min');
-    console.log('⏱️  ¿Es válido?', siguiente.min >= tiempoNecesario);
-
-    if (siguiente.min < tiempoNecesario) {
-      console.log('❌ No hay tiempo suficiente para traslado hacia siguiente');
-      return {
-        disponible: false,
-        error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
-      };
-    }
+  // 8️⃣ VALIDAR que el horario intermedio es viable
+  const gapsValidos = await gapOK(prev, next);
+  if (!gapsValidos) {
+    console.log('❌ Horario intermedio no viable - gaps insuficientes');
+    return {
+      disponible: false,
+      error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
+    };
   }
 
-  console.log('✅ Validación exitosa - reserva permitida');
+  console.log('✅ Validación exitosa - horario intermedio viable');
   return { disponible: true };
 }
 
