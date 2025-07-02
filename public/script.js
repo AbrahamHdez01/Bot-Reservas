@@ -3,6 +3,26 @@ let productos = {};
 let carrito = [];
 let estaciones = [];
 
+// Lista de estaciones cuyo horario inicia 08:30
+const EARLY_STATIONS = [
+  // Línea 8 (Constitución de 1917 ↔ Santa Anita)
+  'constitución de 1917','uam-i','cerro de la estrella','iztapalapa','atlalilco','escuadrón 201','aculco','apatlaco','iztacalco','coyuya','santa anita',
+  // Línea 12 (Periférico Oriente ↔ Atlalilco)
+  'periférico oriente','calle 11','lomas estrella','san andrés tomatlán','culhuacán','atlalilco',
+  // Línea 7 (Mixcoac ↔ Polanco)
+  'mixcoac','san antonio','san pedro de los pinos','tacubaya','constituyentes','auditorio','polanco'
+];
+
+const EXCLUDED_STATIONS = [
+  'deportivo oceanía','romero rubio','ricardo flores magón','bosque de aragón','victoria','nezahualcóyotl','impulsora','rio de los remedios','muñoz','azteca','ciudad azteca','oceanía',
+  'tezonco','olivos','nopalera','zapotitlán','tlaltenco','tláhuac',
+  'peñón viejo','acatitla','santa marta','los reyes','la paz'
+];
+
+function normalizarEstacion(nombre){
+  return nombre.toLowerCase().replace(/[\s\u2019']/g,' ').replace(/\s+/g,' ').trim();
+}
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
     cargarProductos();
@@ -214,7 +234,7 @@ async function cargarEstaciones() {
         const data = await response.json();
         
         // Filtrar estaciones según las reglas de negocio
-        estaciones = data.filter(estacion => estacion.available);
+        estaciones = data.filter(estacion => estacion.available && !EXCLUDED_STATIONS.includes(normalizarEstacion(estacion.name)));
         llenarSelectEstaciones();
     } catch (error) {
         console.error('Error cargando estaciones:', error);
@@ -284,12 +304,8 @@ async function llenarHorasDisponibles() {
     let horaInicio = 10; // Por defecto 10 am
     let horaFin = 17; // 5 pm
     
-    // Ajustar hora de inicio según estación específica
-    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.toLowerCase().includes(n))) {
-        horaInicio = 8.5; // 8:30 am
-    } else if (["periférico oriente", "atlalilco"].some(n => estacion.toLowerCase().includes(n))) {
-        horaInicio = 8.5; // 8:30 am
-    } else if (["mixcoac", "polanco"].some(n => estacion.toLowerCase().includes(n))) {
+    // Ajustar hora de inicio según lista
+    if (EARLY_STATIONS.includes(normalizarEstacion(estacion))) {
         horaInicio = 8.5; // 8:30 am
     }
 
@@ -406,13 +422,9 @@ async function crearReserva(horaForzada = null) {
     let horaInicio = 10;
     let horaFin = 17;
     
-    // Ajustar hora de inicio según estación específica
-    if (["constitución", "chabacano", "la viga", "santa anita"].some(n => estacion.includes(n))) {
-        horaInicio = 8.5;
-    } else if (["periférico oriente", "atlalilco"].some(n => estacion.includes(n))) {
-        horaInicio = 8.5;
-    } else if (["mixcoac", "polanco"].some(n => estacion.includes(n))) {
-        horaInicio = 8.5;
+    // Ajustar hora de inicio según lista
+    if (EARLY_STATIONS.includes(normalizarEstacion(estacion))) {
+        horaInicio = 8.5; // 8:30 am
     }
 
     // Convertir hora seleccionada a formato numérico para validación

@@ -135,6 +135,15 @@ const EARLY_RESTRICTED_STATIONS = new Set([
 
 const EARLY_START_MINUTES = horaToMinutes('08:30');
 
+const EXCLUDED_STATIONS = new Set([
+  // Línea B sin servicio
+  'deportivo oceanía','romero rubio','ricardo flores magón','bosque de aragón','victoria','nezahualcóyotl','impulsora','rio de los remedios','muñoz','azteca','ciudad azteca','oceanía',
+  // Línea 12 sin servicio (ya marcados pero seguridad extra)
+  'tezonco','olivos','nopalera','zapotitlán','tlaltenco','tláhuac',
+  // Línea A sin servicio
+  'peñón viejo','acatitla','santa marta','los reyes','la paz'
+]);
+
 function normalizarEstacion(nombre) {
   return nombre.toLowerCase().replace(/[\s\u2019']/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -192,7 +201,7 @@ export default async function handler(req, res) {
   // 0. Validar que la estación esté permitida y horario temprano
   const estacionNormalizada = normalizarEstacion(estacionDeseada);
   const estacionObj = estaciones.find(e => normalizarEstacion(e.name).includes(estacionNormalizada));
-  if (estacionObj && estacionObj.available === false) {
+  if (EXCLUDED_STATIONS.has(estacionNormalizada)) {
     return res.status(200).json({
       disponible: false,
       error: 'En esta estación no se realizan entregas.'
