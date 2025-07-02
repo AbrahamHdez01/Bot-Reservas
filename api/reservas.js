@@ -1,5 +1,6 @@
 import { supabase, handleSupabaseError } from '../lib/supabase.js';
 import { google } from 'googleapis';
+import { checkDisponibilidad } from './validar-reserva.js';
 
 export default async function handler(req, res) {
   switch (req.method) {
@@ -63,6 +64,22 @@ async function crearReserva(req, res) {
     if (!nombre || !telefono || !estacion || !fecha || !hora || !productos) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
     }
+    
+    console.log('🔍 Validando disponibilidad antes de crear reserva...');
+    const validacion = await checkDisponibilidad({ 
+      fecha, 
+      horaDeseada: hora, 
+      estacionDeseada: estacion 
+    });
+    
+    if (!validacion.disponible) {
+      console.log('❌ Validación falló:', validacion.error);
+      return res.status(400).json({ 
+        error: validacion.error || 'Horario no disponible' 
+      });
+    }
+    
+    console.log('✅ Validación exitosa, procediendo a crear reserva...');
     
     const nuevaReserva = {
       nombre,
