@@ -123,26 +123,47 @@ function esHoraValida(hora) {
   return m === 0 || m === 15 || m === 30 || m === 45;
 }
 
-// Agregar configuraciones de rango/horario y exclusiones
-const EARLY_RESTRICTED_STATIONS = new Set([
-  // Línea 8 – Constitución de 1917 → Santa Anita
-  'constitución de 1917', 'uam-i', 'cerro de la estrella', 'iztapalapa', 'atlalilco', 'escuadrón 201', 'aculco', 'apatlaco', 'iztacalco', 'coyuya', 'santa anita',
-  // Línea 12 – Periférico Oriente → Atlalilco
-  'periférico oriente', 'calle 11', 'lomas estrella', 'san andrés tomatlán', 'culhuacán', 'atlalilco',
-  // Línea 7 – Mixcoac → Polanco
-  'mixcoac', 'san antonio', 'san pedro de los pinos', 'tacubaya', 'constituyentes', 'auditorio', 'polanco'
+// Replace existing EARLY_RESTRICTED_STATIONS and keyword logic
+const EARLY_STATIONS = new Set([
+  "Constitución de 1917, Ciudad de México, CDMX, México",
+  "UAM-I, Ciudad de México, CDMX, México",
+  "Cerro de la Estrella, Ciudad de México, CDMX, México",
+  "Iztapalapa, Ciudad de México, CDMX, México",
+  "Atlalilco, Ciudad de México, CDMX, México",
+  "Escuadrón 201, Ciudad de México, CDMX, México",
+  "Aculco, Ciudad de México, CDMX, México",
+  "Apatlaco, Ciudad de México, CDMX, México",
+  "Iztacalco, Ciudad de México, CDMX, México",
+  "Coyuya, Ciudad de México, CDMX, México",
+  "Santa Anita, Ciudad de México, CDMX, México",
+  "Periférico Oriente, Ciudad de México, CDMX, México",
+  "Calle 11, Ciudad de México, CDMX, México",
+  "Lomas Estrella, Ciudad de México, CDMX, México",
+  "San Andrés Tomatlán, Ciudad de México, CDMX, México",
+  "Culhuacán, Ciudad de México, CDMX, México",
+  "Mixcoac, Ciudad de México, CDMX, México",
+  "San Antonio, Ciudad de México, CDMX, México",
+  "San Pedro de los Pinos, Ciudad de México, CDMX, México",
+  "Tacubaya, Ciudad de México, CDMX, México",
+  "Constituyentes, Ciudad de México, CDMX, México",
+  "Auditorio, Ciudad de México, CDMX, México",
+  "Polanco, Ciudad de México, CDMX, México"
 ]);
 
 const EARLY_START_MINUTES = horaToMinutes('08:30');
 
-const EXCLUDED_STATIONS = new Set([
-  // Línea B sin servicio
+const EXCLUDED_KEYWORDS = [
+  // Línea B
   'deportivo oceanía','romero rubio','ricardo flores magón','bosque de aragón','victoria','nezahualcóyotl','impulsora','rio de los remedios','muñoz','azteca','ciudad azteca','oceanía',
-  // Línea 12 sin servicio (ya marcados pero seguridad extra)
+  // Línea 12
   'tezonco','olivos','nopalera','zapotitlán','tlaltenco','tláhuac',
-  // Línea A sin servicio
+  // Línea A
   'peñón viejo','acatitla','santa marta','los reyes','la paz'
-]);
+];
+
+function incluyeKeywordExcluido(nombreNorm){
+  return EXCLUDED_KEYWORDS.some(k=>nombreNorm.includes(k));
+}
 
 function normalizarEstacion(nombre) {
   return nombre.toLowerCase().replace(/[\s\u2019']/g, ' ').replace(/\s+/g, ' ').trim();
@@ -201,7 +222,7 @@ export default async function handler(req, res) {
   // 0. Validar que la estación esté permitida y horario temprano
   const estacionNormalizada = normalizarEstacion(estacionDeseada);
   const estacionObj = estaciones.find(e => normalizarEstacion(e.name).includes(estacionNormalizada));
-  if (EXCLUDED_STATIONS.has(estacionNormalizada)) {
+  if (incluyeKeywordExcluido(estacionNormalizada)) {
     return res.status(200).json({
       disponible: false,
       error: 'En esta estación no se realizan entregas.'
@@ -209,10 +230,19 @@ export default async function handler(req, res) {
   }
 
   // Restringir reservas antes de 08:30 en estaciones de ciertos rangos
-  if (horaToMinutes(horaDeseada) < EARLY_START_MINUTES && EARLY_RESTRICTED_STATIONS.has(estacionNormalizada)) {
+  if (minutosDeseados < EARLY_START_MINUTES && EARLY_STATIONS.has(estacionDeseada.trim())) {
+    // Early station antes de 08:30 → no permitido (debe ser >= 08:30)
     return res.status(200).json({
       disponible: false,
       error: 'Para esta estación las entregas inician a partir de las 08:30.'
+    });
+  }
+
+  // Para estaciones fuera de la lista, bloquear horas antes de 10:00
+  if (minutosDeseados < horaToMinutes('10:00') && !EARLY_STATIONS.has(estacionDeseada.trim())) {
+    return res.status(200).json({
+      disponible: false,
+      error: 'Las entregas en esta estación inician a partir de las 10:00.'
     });
   }
 
