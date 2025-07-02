@@ -168,24 +168,19 @@ function incluyeKeywordExcluido(nombreNorm){
 function normalizeName(n){return n.toLowerCase().replace(/[\s\u2019']/g,' ').replace(/\s+/g,' ').trim();}
 const isEarlyStation = (n)=>EARLY_STATIONS.has([...EARLY_STATIONS].find(s=>normalizeName(s)===normalizeName(n))||'');
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
-
-  const { fecha, horaDeseada, estacionDeseada } = req.body;
+export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada }) {
   console.log('🔍 Validando reserva:', { fecha, horaDeseada, estacionDeseada });
   
   if (!fecha || !horaDeseada || !estacionDeseada) {
-    return res.status(400).json({ error: 'Faltan datos' });
+    return { error: 'Faltan datos' };
   }
 
   // 3. Validar intervalos de 15 minutos
   if (!esHoraValida(horaDeseada)) {
     console.log('❌ Hora no válida (no es :00, :15, :30 o :45):', horaDeseada);
-    return res.status(400).json({
+    return {
       error: 'Solo puedes reservar en intervalos de 15 minutos (ej: 9:00, 9:15, 9:30, 9:45).',
-    });
+    };
   }
 
   // Cargar estaciones (por si se requiere en el futuro)
@@ -197,7 +192,7 @@ export default async function handler(req, res) {
     );
     estaciones = JSON.parse(estacionesRaw);
   } catch (e) {
-    return res.status(500).json({ error: 'No se pudieron cargar las estaciones' });
+    return { error: 'No se pudieron cargar las estaciones' };
   }
 
   // Obtener todas las reservas del día ordenadas por hora ascendente
@@ -209,7 +204,7 @@ export default async function handler(req, res) {
     .order('hora', { ascending: true });
   if (error) {
     console.error('❌ Error consultando reservas:', error);
-    return res.status(500).json({ error: 'Error consultando reservas' });
+    return { error: 'Error consultando reservas' };
   }
 
   console.log('📋 Reservas existentes para', fecha, ':', reservas.length, 'reservas');
@@ -222,27 +217,27 @@ export default async function handler(req, res) {
   const estacionNormalizada = normalizeName(estacionDeseada);
   const estacionObj = estaciones.find(e => normalizeName(e.name).includes(estacionNormalizada));
   if (incluyeKeywordExcluido(estacionNormalizada)) {
-    return res.status(200).json({
+    return {
       disponible: false,
       error: 'En esta estación no se realizan entregas.'
-    });
+    };
   }
 
   // Restringir reservas antes de 08:30 en estaciones de ciertos rangos
   if (minutosDeseados < EARLY_START_MINUTES && isEarlyStation(estacionDeseada)) {
     // Early station antes de 08:30 → no permitido (debe ser >= 08:30)
-    return res.status(200).json({
+    return {
       disponible: false,
       error: 'Para esta estación las entregas inician a partir de las 08:30.'
-    });
+    };
   }
 
   // Para estaciones fuera de la lista, bloquear horas antes de 10:00
   if (minutosDeseados < horaToMinutes('10:00') && !isEarlyStation(estacionDeseada)) {
-    return res.status(200).json({
+    return {
       disponible: false,
       error: 'Las entregas en esta estación inician a partir de las 10:00.'
-    });
+    };
   }
 
   // 1. Validar empalme - Permitir múltiples reservas en la misma estación/hora/fecha
@@ -258,10 +253,10 @@ export default async function handler(req, res) {
       console.log('   Nueva reserva:', horaDeseada, estacionDeseada);
     } else {
       console.log('❌ Empalme detectado en diferente estación:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion, 'vs', estacionDeseada);
-      return res.status(200).json({
+      return {
         disponible: false,
         error: 'Ya hay otra reservación a esa hora en una estación diferente. Por favor elige otro horario.'
-      });
+      };
     }
   }
 
@@ -290,13 +285,30 @@ export default async function handler(req, res) {
     
     if (minutosDeseados < tiempoMinimoRequerido) {
       console.log('❌ No hay tiempo suficiente para traslado');
-      return res.status(200).json({
+      return {
         disponible: false,
         error: 'El repartidor no podrá llegar a tiempo desde la entrega anterior. Elige una hora más tarde.'
-      });
+      };
     }
   }
 
   console.log('✅ Validación exitosa - reserva permitida');
-  return res.status(200).json({ disponible: true });
-} 
+  return { disponible: true };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
+
+  const { fecha, horaDeseada, estacionDeseada } = req.body;
+  const result = await checkDisponibilidad({ fecha, horaDeseada, estacionDeseada });
+
+  if (result.error) {
+    return res.status(400).json(result);
+  }
+
+  return res.status(200).json(result);
+}
+
+export { horaToMinutes, checkDisponibilidad }; 
