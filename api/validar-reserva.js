@@ -117,10 +117,10 @@ async function calcularDuracionMaps(origen, destino) {
   return 35;
 }
 
-// Solo permite horas en :00 o :30
+// Solo permite horas en :00, :15, :30 o :45
 function esHoraValida(hora) {
   const [_, m] = hora.split(':').map(Number);
-  return m === 0 || m === 30;
+  return m === 0 || m === 15 || m === 30 || m === 45;
 }
 
 export default async function handler(req, res) {
@@ -135,11 +135,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Faltan datos' });
   }
 
-  // 3. Validar intervalos de 30 minutos
+  // 3. Validar intervalos de 15 minutos
   if (!esHoraValida(horaDeseada)) {
-    console.log('❌ Hora no válida (no es :00 o :30):', horaDeseada);
+    console.log('❌ Hora no válida (no es :00, :15, :30 o :45):', horaDeseada);
     return res.status(400).json({
-      error: 'Solo puedes reservar en intervalos de 30 minutos (ej: 9:00, 9:30).',
+      error: 'Solo puedes reservar en intervalos de 15 minutos (ej: 9:00, 9:15, 9:30, 9:45).',
     });
   }
 
