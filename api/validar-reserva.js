@@ -90,8 +90,9 @@ export default async function handler(req, res) {
   const reservaEnMismaHora = reservas.find(r => horaToMinutes(r.hora) === minutosDeseados);
   if (reservaEnMismaHora) {
     console.log('❌ Empalme detectado con reserva:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion);
-    return res.status(400).json({
-      error: '¡Ups! Ya hay una entrega programada a esa hora. Elige otra por favor.'
+    return res.status(200).json({
+      disponible: false,
+      error: 'Ya hay otra reservación a esa hora. Por favor elige otro horario.'
     });
   }
 
@@ -120,12 +121,13 @@ export default async function handler(req, res) {
     
     if (minutosDeseados < tiempoMinimoRequerido) {
       console.log('❌ No hay tiempo suficiente para traslado');
-      return res.status(400).json({
-        error: 'No es posible llegar a tiempo desde la entrega anterior. Elige una hora posterior.'
+      return res.status(200).json({
+        disponible: false,
+        error: 'El repartidor no podrá llegar a tiempo desde la entrega anterior. Elige una hora más tarde.'
       });
     }
   }
 
   console.log('✅ Validación exitosa - reserva permitida');
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({ disponible: true });
 } 

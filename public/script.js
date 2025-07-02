@@ -430,23 +430,20 @@ async function crearReserva(horaForzada = null) {
             });
             const validarData = await validarResp.json();
             if (!validarData.disponible) {
-                if (validarData.horaSugerida) {
-                    if (confirm(`${validarData.mensaje}\n¿Quieres reservar a las ${validarData.horaSugerida}?`)) {
-                        // Reintentar con la hora sugerida
-                        return crearReserva(validarData.horaSugerida);
-                    } else {
-                        mostrarError('Por favor elige otra hora.');
-                        return;
-                    }
-                } else {
-                    mostrarError(validarData.motivo || 'No hay horarios disponibles.');
-                    return;
-                }
+                mostrarError(validarData.error || 'No hay horarios disponibles.');
+                return;
             }
         } catch (e) {
             mostrarError('No se pudo validar la disponibilidad. Intenta de nuevo.');
             return;
         }
+    }
+
+    // Deshabilitar botón al comenzar el proceso
+    const btn = document.getElementById('confirmarReservaBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Procesando...';
     }
 
     try {
@@ -492,7 +489,6 @@ async function crearReserva(horaForzada = null) {
         mostrarError('Error de conexión. Intenta de nuevo.');
     }
 
-    const btn = document.getElementById('confirmarReservaBtn');
     if (btn) {
         btn.disabled = false;
         btn.textContent = 'Confirmar Reserva';
