@@ -13,6 +13,6 @@
     { "source": "/style.css", "destination": "/public/style.css" },
     { "source": "/script.js", "destination": "/public/script.js" },
     { "source": "/admin.js", "destination": "/public/admin.js" },
-    { "source": "/(.*).json", "destination": "/public/$1.json" }
+    { "source": "/((?!api).*)\\.(json)", "destination": "/public/$1.$2" }
   ]
 } 
