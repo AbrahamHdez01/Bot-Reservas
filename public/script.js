@@ -366,21 +366,19 @@ async function llenarHorasDisponibles() {
         // Si falla, no bloquea ninguna hora
     }
 
-    // Generar opciones de hora en intervalos de 15 minutos
-    for (let hora = horaInicio; hora <= horaFin; hora += 0.25) {
-        const minutos = (hora % 1) * 60;
-        if (minutos !== 0 && minutos !== 15 && minutos !== 30 && minutos !== 45) continue; // Solo :00, :15, :30 y :45
-        const horaFormateada = formatearHora(hora);
-        const hora24 = to24Hour(horaFormateada);
-        
-        // Solo bloquear si hay reserva en DIFERENTE estación a esa hora
-        // Permitir si la reserva existente es en la MISMA estación
-        if (!horasOcupadasOtrasEstaciones.includes(hora24)) {
-            const option = document.createElement('option');
-            option.value = horaFormateada;
-            option.textContent = horaFormateada;
-            horaSelect.appendChild(option);
-        }
+    try{
+      const resp=await fetch(`/api/horas-disponibles?fecha=${fechaInput.value}&estacion=${encodeURIComponent(estacion)}`);
+      if(resp.ok){
+        const {horas}=await resp.json();
+        horas.forEach(h=>{
+          const option=document.createElement('option');
+          option.value=h;
+          option.textContent=h;
+          horaSelect.appendChild(option);
+        });
+      }
+    }catch(e){
+      console.error('Error cargando horas disponibles',e);
     }
 }
 
