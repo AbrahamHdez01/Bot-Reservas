@@ -297,31 +297,33 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     };
   }
 
-  // 4️⃣ Validar empalme: misma fecha + hora permitida SOLO si es la misma estación
-  const reservaEnMismaHora = reservas.find(r => horaToMinutes(r.hora) === minutosDeseados);
-  if (reservaEnMismaHora) {
-    const estacionExistente = reservaEnMismaHora.estacion.toLowerCase().trim();
-    const estacionNueva = estacionDeseada.toLowerCase().trim();
-    
-    if (estacionExistente === estacionNueva) {
-      console.log('✅ Misma estación, hora y fecha - Permitido para múltiples entregas');
-      console.log('   Reserva existente:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion);
-      console.log('   Nueva reserva:', horaDeseada, estacionDeseada);
-    } else {
-      console.log('❌ Empalme detectado en diferente estación:', reservaEnMismaHora.hora, reservaEnMismaHora.estacion, 'vs', estacionDeseada);
-      return {
-        disponible: false,
-        error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
-      };
+  // 4️⃣ Empalme exacto — versión robusta
+  for (const r of reservas) {
+    if (horaToMinutes(r.hora) === horaToMinutes(horaDeseada)) {
+      if (r.estacion !== estacionDeseada) {
+        console.log('❌ Empalme detectado:', r.hora, r.estacion, 'vs', horaDeseada, estacionDeseada);
+        return {
+          disponible: false,
+          error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
+        };
+      }
+      // misma estación → se permite, pero la ignoramos al checar márgenes
+      console.log('✅ Misma estación permitida:', r.hora, r.estacion);
     }
   }
 
-  // 5️⃣ Validar margen ANTERIOR: horaPrev + 15 + dur(prev->nueva) ≤ horaNueva
-  const reservasPrevias = reservas
+  // 🔧 Filtrar reservas idénticas para cálculo de márgenes
+  const reservasFiltradas = reservas.filter(
+    r => !(horaToMinutes(r.hora) === horaToMinutes(horaDeseada) &&
+           r.estacion === estacionDeseada)
+  );
+
+  // 5️⃣ Validar margen ANTERIOR usando reservas filtradas
+  const reservasPrevias = reservasFiltradas
     .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
     .filter(r => r.min < minutosDeseados);
 
-  console.log('📅 Reservas previas:', reservasPrevias.length);
+  console.log('📅 Reservas previas (filtradas):', reservasPrevias.length);
   reservasPrevias.forEach(r => console.log('  -', r.hora, r.estacion, '(', r.min, 'min)'));
 
   if (reservasPrevias.length > 0) {
@@ -347,8 +349,8 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     }
   }
 
-  // 6️⃣ Validar margen SIGUIENTE: horaNueva + 15 + dur(nueva->next) ≤ horaNext
-  const reservasPosteriores = reservas
+  // 6️⃣ Validar margen SIGUIENTE usando reservas filtradas
+  const reservasPosteriores = reservasFiltradas
     .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
     .filter(r => r.min > minutosDeseados);
 
