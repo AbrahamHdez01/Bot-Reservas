@@ -10,7 +10,9 @@
     { "source": "/admin", "destination": "/public/admin.html" },
     { "source": "/admin.html", "destination": "/public/admin.html" },
     { "source": "/index.html", "destination": "/public/index.html" },
-    { "source": "/static/(.*)", "destination": "/static/$1" },
-    { "source": "/(.*\\.(css|js|json|png|jpg|jpeg|gif|svg|ico))", "destination": "/public/$1" }
+    { "source": "/style.css", "destination": "/public/style.css" },
+    { "source": "/script.js", "destination": "/public/script.js" },
+    { "source": "/admin.js", "destination": "/public/admin.js" },
+    { "source": "/(.*).json", "destination": "/public/$1.json" }
   ]
 } 
