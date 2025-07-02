@@ -292,6 +292,31 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     }
   }
 
+  // 3. Validar traslado hacia la siguiente reserva
+  const reservasPosteriores = reservas
+    .map(r => ({ ...r, min: horaToMinutes(r.hora) }))
+    .filter(r => r.min > minutosDeseados);
+
+  if (reservasPosteriores.length > 0) {
+    const siguiente = reservasPosteriores[0]; // ya vienen ordenadas asc
+    console.log('🚇 Calculando traslado desde estación solicitada hacia siguiente reserva:', estacionDeseada, '→', siguiente.estacion);
+
+    const duracionMin = await calcularDuracionMaps(estacionDeseada, siguiente.estacion);
+    const margen = 15 + duracionMin;
+    const tiempoNecesario = minutosDeseados + margen;
+
+    console.log('⏱️  Duración traslado (hacia siguiente):', duracionMin, 'min');
+    console.log('⏱️  Margen total:', margen, 'min');
+    console.log('⏱️  Próxima reserva', siguiente.hora, '(', siguiente.min, 'min )');
+
+    if (siguiente.min < tiempoNecesario) {
+      return {
+        disponible: false,
+        error: 'El repartidor no alcanzará a llegar a la siguiente entrega a tiempo. Elige una hora más temprana.'
+      };
+    }
+  }
+
   console.log('✅ Validación exitosa - reserva permitida');
   return { disponible: true };
 }
