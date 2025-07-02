@@ -6,6 +6,19 @@
     }
   },
   "rewrites": [
-    { "source": "/admin", "destination": "/admin.html" }
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/admin", "destination": "/public/admin.html" },
+    { "source": "/admin.html", "destination": "/public/admin.html" },
+    { "source": "/index.html", "destination": "/public/index.html" }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*\\.(css|js|json|png|jpg|jpeg|gif|svg|ico))",
+      "dest": "/public/$1"
+    }
   ]
 } 
