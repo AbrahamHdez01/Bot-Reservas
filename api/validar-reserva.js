@@ -5,10 +5,32 @@ import fetch from 'node-fetch';
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
-// Convierte 'HH:MM' a minutos desde las 00:00
+// Convierte 'HH:MM' o 'HH:MMam/pm' a minutos desde 00:00
 function horaToMinutes(hora) {
-  const [h, m] = hora.split(':').map(Number);
-  return h * 60 + m;
+  if (!hora) return NaN;
+  hora = hora.trim();
+
+  // Formato 24h HH:MM
+  const match24 = hora.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const h = parseInt(match24[1], 10);
+    const m = parseInt(match24[2], 10);
+    return h * 60 + m;
+  }
+
+  // Formato 12h con espacio o sin espacio antes de AM/PM, mayúsc/minúsc
+  const match12 = hora.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (match12) {
+    let h = parseInt(match12[1], 10);
+    const m = parseInt(match12[2], 10);
+    const ampm = match12[3].toUpperCase();
+    if (ampm === 'PM' && h !== 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  }
+
+  console.warn('horaToMinutes: formato no reconocido', hora);
+  return NaN;
 }
 
 // Convierte minutos desde las 00:00 a 'HH:MM'
