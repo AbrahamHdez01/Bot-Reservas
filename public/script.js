@@ -491,7 +491,7 @@ async function crearReserva(horaForzada = null) {
                 return;
             }
         } catch (e) {
-            mostrarError('No se pudo validar la disponibilidad. Intenta de nuevo.');
+            mostrarError('Ya hay una reserva a esa hora en otra estación. Intenta con otro horario.');
             return;
         }
     }
