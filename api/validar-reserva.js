@@ -311,8 +311,10 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
 
   const tNueva = minutosDeseados;
   const efectivasConMinutos = efectivas.map(r => ({ ...r, min: horaToMinutes(r.hora) }));
-  const hoyStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date());
-  if (fecha === hoyStr) {
+  const TZ = 'America/Mexico_City';
+  const hoyStr = new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date());
+  const fechaNorm = new Intl.DateTimeFormat('en-CA',{timeZone:TZ}).format(new Date(fecha));
+  if (fechaNorm === hoyStr) {
     return res.status(400).json({
       error: 'Las reservas deben hacerse al menos con un día de anticipación.'
     });
@@ -337,7 +339,7 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     // Validar margen hacia SIGUIENTE  
     if (next) {
       const durNext = await calcularDuracionMaps(estacionDeseada, next.estacion);
-      const needNext = 15 + durNext;
+      const needNext = 15 + durNext; // ← ya sin el segundo +15
       const gapNext = next.min - tNueva;
       if (gapNext < needNext) return false;
     }
