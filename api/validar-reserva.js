@@ -141,10 +141,26 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     return { error: 'Faltan datos' };
 
   // 0. Bloqueo fecha de hoy (normalizada) - solo mismo día
-  const fechaNorm = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(
-    new Date(fecha)
-  );
-  if (fechaNorm === hoyMX())
+  const hoy = hoyMX();
+  
+  // Normalizar la fecha de entrada para asegurar formato correcto
+  let fechaNorm;
+  try {
+    // Si la fecha viene en formato YYYY-M-D, la normalizamos
+    if (typeof fecha === 'string' && fecha.match(/^\d{4}-\d{1,2}-\d{1,2}$/)) {
+      const [year, month, day] = fecha.split('-');
+      fechaNorm = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    } else {
+      // Para otros formatos, usar la conversión estándar
+      fechaNorm = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(
+        new Date(fecha)
+      );
+    }
+  } catch (e) {
+    return { error: 'Formato de fecha inválido.' };
+  }
+  
+  if (fechaNorm === hoy)
     return { error: 'No se pueden hacer reservas para el mismo día. Selecciona mañana o una fecha posterior.' };
 
   // 1. Bloque de 15 min
