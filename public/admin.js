@@ -85,7 +85,8 @@ function llenarFiltroEstaciones() {
     const select = document.getElementById('filter-estacion');
     const estacionesUnicas = [...new Set(estaciones.map(e => e.name))];
     
-    estacionesUnicas.forEach(estacion => {
+    // Ordenar estaciones alfabéticamente
+    estacionesUnicas.sort((a, b) => a.localeCompare(b)).forEach(estacion => {
         const option = document.createElement('option');
         option.value = estacion;
         option.textContent = estacion;

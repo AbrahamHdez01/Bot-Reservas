@@ -287,7 +287,8 @@ function llenarSelectEstaciones() {
     const select = document.getElementById('estacion');
     select.innerHTML = '<option value="">Selecciona una estación</option>';
     
-    estaciones.forEach(estacion => {
+    // Ordenar estaciones alfabéticamente por nombre
+    estaciones.sort((a, b) => a.name.localeCompare(b.name)).forEach(estacion => {
         const option = document.createElement('option');
         option.value = estacion.name;
         option.textContent = estacion.name;
