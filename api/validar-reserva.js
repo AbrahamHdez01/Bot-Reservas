@@ -140,12 +140,12 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
   if (!fecha || !horaDeseada || !estacionDeseada)
     return { error: 'Faltan datos' };
 
-  // 0. Bloqueo fecha de hoy (normalizada)
+  // 0. Bloqueo fecha de hoy (normalizada) - solo mismo día
   const fechaNorm = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(
     new Date(fecha)
   );
   if (fechaNorm === hoyMX())
-    return { error: 'Las reservas deben hacerse al menos con un día de anticipación.' };
+    return { error: 'No se pueden hacer reservas para el mismo día. Selecciona mañana o una fecha posterior.' };
 
   // 1. Bloque de 15 min
   if (!esHoraValida(horaDeseada))
