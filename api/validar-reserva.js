@@ -267,8 +267,10 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
     return { error: 'Error consultando reservas' };
   }
 
-  console.log('📋 Reservas existentes para', fecha, ':', reservas.length, 'reservas');
-  reservas.forEach(r => console.log('  -', r.hora, r.estacion, r.estado));
+  const reservasList = Array.isArray(reservas) ? reservas : [];
+
+  console.log('📋 Reservas existentes para', fecha, ':', reservasList.length, 'reservas');
+  reservasList.forEach(r => console.log('  -', r.hora, r.estacion, r.estado));
 
   const minutosDeseados = horaToMinutes(horaDeseada);
   console.log('⏰ Minutos deseados:', minutosDeseados, '(', horaDeseada, ')');
@@ -298,7 +300,7 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
   }
 
   // 🚨 BLOQUEO ESTRICTO: No permitir ninguna reserva en la misma hora (sin importar estación)
-  for (const r of reservas) {
+  for (const r of reservasList) {
     if (horaToMinutes(r.hora) === minutosDeseados) {
       return res.status(400).json({
         error: '¡Ups! El repartidor no puede completar esta entrega. Selecciona otro horario.'
@@ -307,7 +309,7 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
   }
 
   // 1️⃣ Lista de reservas efectivas (todas, ya que no puede haber duplicados)
-  const efectivas = reservas;
+  const efectivas = reservasList;
 
   const tNueva = minutosDeseados;
   const efectivasConMinutos = efectivas.map(r => ({ ...r, min: horaToMinutes(r.hora) }));
