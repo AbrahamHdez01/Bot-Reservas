@@ -9,7 +9,8 @@
     "deploy": "vercel --prod",
     "setup-google": "node scripts/setup-google-calendar.js",
     "refresh-token": "node scripts/refresh-google-token.js",
-    "test-calendar": "node api/test-calendar.js"
+    "test-calendar": "node api/test-calendar.js",
+    "test-grafo": "node scripts/testGrafo.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
