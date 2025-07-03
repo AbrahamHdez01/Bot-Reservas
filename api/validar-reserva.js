@@ -65,17 +65,26 @@ async function calcularDuracion(origen, destino) {
   const hit = directionsCache.get(key);
   if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.min;
 
-  // PASO 1: Intentar con grafo topológico del metro
-  try {
-    const tiempoMetro = tiempoGrafo(origen, destino);
-    if (tiempoMetro !== null) {
-      console.log(`DEBUG: Usando grafo metro: ${o} -> ${d} = ${tiempoMetro} min`);
-      directionsCache.set(key, { min: tiempoMetro, ts: Date.now() });
-      return tiempoMetro;
+  // PASO 1: Intentar con grafo topológico del metro (múltiples formatos)
+  const formatosOrigen = [origen, o];
+  const formatosDestino = [destino, d];
+  
+  for (const formatoOrigen of formatosOrigen) {
+    for (const formatoDestino of formatosDestino) {
+      try {
+        const tiempoMetro = tiempoGrafo(formatoOrigen, formatoDestino);
+        if (tiempoMetro !== null) {
+          console.log(`DEBUG: Usando grafo metro: ${formatoOrigen} -> ${formatoDestino} = ${tiempoMetro} min`);
+          directionsCache.set(key, { min: tiempoMetro, ts: Date.now() });
+          return tiempoMetro;
+        }
+      } catch (error) {
+        // Continuar con el siguiente formato
+      }
     }
-  } catch (error) {
-    console.log(`DEBUG: Error en grafo metro: ${error.message}`);
   }
+  
+  console.log(`DEBUG: Grafo metro no encontró: ${o} -> ${d}`);
 
   // PASO 2: Fallback a Google Maps Directions
   if (!GOOGLE_MAPS_API_KEY) {
