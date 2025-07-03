@@ -444,7 +444,7 @@ async function crearReserva(horaForzada = null) {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     if (fechaSeleccionada < hoy) {
-        mostrarError('No puedes seleccionar una fecha pasada');
+        mostrarError('No puedes reservar para el mismo dia de hoy');
         return;
     }
 
