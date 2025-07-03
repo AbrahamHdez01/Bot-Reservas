@@ -311,9 +311,19 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
 
   const tNueva = minutosDeseados;
   const efectivasConMinutos = efectivas.map(r => ({ ...r, min: horaToMinutes(r.hora) }));
-  const idx = efectivasConMinutos.findIndex(r => r.min > tNueva);
-  const prev = idx > 0 ? efectivasConMinutos[idx - 1] : null;
-  const next = idx >= 0 ? efectivasConMinutos[idx] : null;
+  const hoyStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date());
+  if (fecha === hoyStr) {
+    return res.status(400).json({
+      error: 'Las reservas deben hacerse al menos con un día de anticipación.'
+    });
+  }
+  // Lógica para prev/next:
+  let prev = null;
+  let next = null;
+  for (const r of efectivasConMinutos) {
+    if (r.min < tNueva) prev = r;
+    else if (r.min > tNueva) { next = r; break; }
+  }
 
   // 2️⃣ Validar márgenes prev/next
   async function gapOK(prev, next) {
