@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js';
+import { tiempoGrafo } from '../lib/metroGrafo.js';
 import fs from 'fs/promises';
 import path from 'path';
 import fetch from 'node-fetch';
@@ -24,8 +25,8 @@ function horaToMinutes(hora) {
     const ampm = match12[3].toUpperCase();
     if (ampm === 'PM' && h !== 12) h += 12;
     if (ampm === 'AM' && h === 12) h = 0;
-    return h * 60 + m;
-  }
+  return h * 60 + m;
+}
   const match12simple = hora.match(/^(\d{1,2})\s*(am|pm)$/i);
   if (match12simple) {
     let h = parseInt(match12simple[1], 10);
@@ -45,12 +46,12 @@ function minutesToHora(min) {
 }
 
 /* ──────────────────────────────────────────────────────────
-   DIRECTIONS CON CACHE
+   CÁLCULO DE DURACIÓN CON GRAFO + GOOGLE MAPS FALLBACK
 ─────────────────────────────────────────────────────────── */
 const directionsCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 h
 
-async function calcularDuracionMaps(origen, destino) {
+async function calcularDuracion(origen, destino) {
   const limpiar = (s) =>
     s.replace(/, (Ciudad|Estado) de.*$/, '')
       .replace(/\\.*$/, '')
@@ -64,26 +65,49 @@ async function calcularDuracionMaps(origen, destino) {
   const hit = directionsCache.get(key);
   if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.min;
 
-  if (!GOOGLE_MAPS_API_KEY) return 40;
+  // PASO 1: Intentar con grafo topológico del metro
+  try {
+    const tiempoMetro = tiempoGrafo(origen, destino);
+    if (tiempoMetro !== null) {
+      console.log(`DEBUG: Usando grafo metro: ${o} -> ${d} = ${tiempoMetro} min`);
+      directionsCache.set(key, { min: tiempoMetro, ts: Date.now() });
+      return tiempoMetro;
+    }
+  } catch (error) {
+    console.log(`DEBUG: Error en grafo metro: ${error.message}`);
+  }
+
+  // PASO 2: Fallback a Google Maps Directions
+  if (!GOOGLE_MAPS_API_KEY) {
+    console.log(`DEBUG: Sin API key y estaciones no en grafo: ${o} -> ${d}, usando fallback 15 min`);
+    return 15;
+  }
 
   const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(
     o
   )}&destination=${encodeURIComponent(
     d
   )}&mode=transit&transit_mode=subway&departure_time=now&region=mx&language=es&key=${GOOGLE_MAPS_API_KEY}`;
+      
   try {
     const r = await fetch(url);
     const j = await r.json();
     if (j.status === 'OK') {
       const seg = j.routes[0].legs[0].duration.value;
-      const min = Math.max(Math.min(Math.ceil(seg / 60), 90), 8);
-      directionsCache.set(key, { min, ts: Date.now() });
-      return min;
-    }
-  } catch {}
-  return 35; // fallback
-}
-
+      const googleMinutes = Math.max(Math.min(Math.ceil(seg / 60), 90), 8); // Límites 8-90
+      console.log(`DEBUG: Usando Google Maps: ${o} -> ${d} = ${googleMinutes} min`);
+      directionsCache.set(key, { min: googleMinutes, ts: Date.now() });
+      return googleMinutes;
+        }
+  } catch (error) {
+    console.log(`DEBUG: Error Google Maps: ${error.message}`);
+      }
+      
+  // PASO 3: Fallback final
+  console.log(`DEBUG: Fallback final: ${o} -> ${d} = 15 min`);
+  return 15;
+  }
+  
 /* ──────────────────────────────────────────────────────────
    CONSTANTES DE NEGOCIO
 ─────────────────────────────────────────────────────────── */
@@ -215,12 +239,18 @@ export async function checkDisponibilidad({ fecha, horaDeseada, estacionDeseada 
 
   const gapOK = async () => {
     if (prev) {
-      const need = 15 + (await calcularDuracionMaps(prev.estacion, estacionDeseada));
-      if (tNueva - prev.min < need) return false;
+      const duracion = await calcularDuracion(prev.estacion, estacionDeseada);
+      const need = 15 + duracion;
+      const gap = tNueva - prev.min;
+      console.log(`DEBUG prev: ${prev.estacion} -> ${estacionDeseada}, duracion: ${duracion}min, need: ${need}min, gap: ${gap}min, OK: ${gap >= need}`);
+      if (gap < need) return false;
     }
     if (next) {
-      const need = 15 + (await calcularDuracionMaps(estacionDeseada, next.estacion));
-      if (next.min - tNueva < need) return false;
+      const duracion = await calcularDuracion(estacionDeseada, next.estacion);
+      const need = 15 + duracion;
+      const gap = next.min - tNueva;
+      console.log(`DEBUG next: ${estacionDeseada} -> ${next.estacion}, duracion: ${duracion}min, need: ${need}min, gap: ${gap}min, OK: ${gap >= need}`);
+      if (gap < need) return false;
     }
     return true;
   };
