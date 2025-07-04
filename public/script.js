@@ -180,17 +180,27 @@ function configurarSelectorProductos() {
         e.preventDefault();
         const categoria = categoriaSelect.value;
         
+        console.log('Formulario enviado - Categoría:', categoria);
+        
         if (categoria === 'libros') {
             const nombreLibro = libroCustomInput.value.trim();
-            if (!nombreLibro) return;
+            console.log('Nombre del libro:', nombreLibro);
+            if (!nombreLibro) {
+                mostrarError('Por favor ingresa el nombre del libro');
+                return;
+            }
             agregarLibroPersonalizado(nombreLibro);
             libroCustomInput.value = '';
         } else {
-            const productoId = productoSelect.value;
-            if (!categoria || !productoId) return;
-            agregarAlCarrito(productoId, 1);
-            // Resetear selección de producto
-            productoSelect.value = '';
+        const productoId = productoSelect.value;
+            console.log('Producto seleccionado:', productoId);
+            if (!categoria || !productoId) {
+                mostrarError('Por favor selecciona una categoría y un producto');
+                return;
+            }
+        agregarAlCarrito(productoId, 1);
+        // Resetear selección de producto
+        productoSelect.value = '';
         }
     });
 }
@@ -232,7 +242,7 @@ function agregarLibroPersonalizado(nombreLibro) {
         carrito.push({
             id: libroId,
             nombre: nombreLibro,
-            precio: 150, // Precio fijo para libros
+            precio: 200, // Precio fijo para libros
             cantidad: 1,
             categoria: 'libros',
             custom: true
