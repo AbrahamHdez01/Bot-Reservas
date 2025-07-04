@@ -71,14 +71,14 @@ async function calcularDuracion(origen, destino) {
   
   for (const formatoOrigen of formatosOrigen) {
     for (const formatoDestino of formatosDestino) {
-      try {
+  try {
         const tiempoMetro = tiempoGrafo(formatoOrigen, formatoDestino);
-        if (tiempoMetro !== null) {
+    if (tiempoMetro !== null) {
           console.log(`DEBUG: Usando grafo metro: ${formatoOrigen} -> ${formatoDestino} = ${tiempoMetro} min`);
-          directionsCache.set(key, { min: tiempoMetro, ts: Date.now() });
-          return tiempoMetro;
-        }
-      } catch (error) {
+      directionsCache.set(key, { min: tiempoMetro, ts: Date.now() });
+      return tiempoMetro;
+    }
+  } catch (error) {
         // Continuar con el siguiente formato
       }
     }

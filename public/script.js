@@ -175,6 +175,15 @@ function configurarSelectorProductos() {
     const libroCustomInput = document.getElementById('libroCustomInput');
     const addProductForm = document.getElementById('addProductForm');
 
+    // --- Validación reactiva para libros personalizados ---
+    libroCustomInput.addEventListener('input', () => {
+      if (libroCustomInput.value.trim() === '') {
+        libroCustomInput.setCustomValidity('Escribe el título del libro');
+      } else {
+        libroCustomInput.setCustomValidity('');
+      }
+    });
+
     categoriaSelect.addEventListener('change', llenarSelectorProductos);
     addProductForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -184,24 +193,24 @@ function configurarSelectorProductos() {
         
         if (categoria === 'libros') {
             const nombreLibro = libroCustomInput.value.trim();
-            console.log('Nombre del libro:', nombreLibro);
             if (!nombreLibro) {
-                mostrarError('Por favor ingresa el nombre del libro');
+                mostrarError('Es obligatorio escribir el título del libro');
+                libroCustomInput.focus();
                 return;
             }
             agregarLibroPersonalizado(nombreLibro);
             libroCustomInput.value = '';
-        } else {
+            return;
+        }
         const productoId = productoSelect.value;
-            console.log('Producto seleccionado:', productoId);
-            if (!categoria || !productoId) {
-                mostrarError('Por favor selecciona una categoría y un producto');
-                return;
-            }
+        console.log('Producto seleccionado:', productoId);
+        if (!categoria || !productoId) {
+            mostrarError('Por favor selecciona una categoría y un producto');
+            return;
+        }
         agregarAlCarrito(productoId, 1);
         // Resetear selección de producto
         productoSelect.value = '';
-        }
     });
 }
 
