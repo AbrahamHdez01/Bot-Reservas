@@ -146,16 +146,18 @@ function llenarSelectorProductos() {
     
     productoSelect.innerHTML = '<option value="">Selecciona un producto</option>';
     
-    // Mostrar/ocultar input personalizado para libros
+    // Mostrar / ocultar input personalizado para libros
     if (categoria === 'libros') {
-        productoSelect.style.display = 'none';
-        libroCustomInput.style.display = 'block';
-        libroCustomInput.required = true;
+      productoSelect.style.display = 'none';
+      productoSelect.required = false;          // 🔸  <-- NUEVO
+      libroCustomInput.style.display = 'block';
+      libroCustomInput.required = true;
     } else {
-        productoSelect.style.display = 'block';
-        libroCustomInput.style.display = 'none';
-        libroCustomInput.required = false;
-        libroCustomInput.value = '';
+      productoSelect.style.display = 'block';
+      productoSelect.required = true;           // 🔸  <-- NUEVO
+      libroCustomInput.style.display = 'none';
+      libroCustomInput.required = false;
+      libroCustomInput.value = '';
     }
     
     if (!categoria || !productos[categoria]) return;
