@@ -45,6 +45,7 @@
                             <select id="productoSelect" name="producto" required style="background: var(--surface-color); color: var(--primary-color); font-weight: 600;">
                                 <option value="">Selecciona un producto</option>
                             </select>
+                            <input type="text" id="libroCustomInput" name="libroCustom" placeholder="Escribe el nombre del libro" style="display: none; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem;">
                         </div>
                         <button type="submit" class="btn-primary btn-full" style="margin-top: 0.5rem;">Agregar al carrito</button>
                     </form>
@@ -64,6 +65,9 @@
                         <button class="btn-primary btn-full" onclick="goToReservation()">
                             Continuar a Reserva
                         </button>
+                        <p class="payment-notice">
+                            📝 Recuerda que no recibimos pagos anticipados, estos se hacen únicamente contra entrega
+                        </p>
                     </div>
                 </div>
             </section>

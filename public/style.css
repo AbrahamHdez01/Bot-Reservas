@@ -6,14 +6,14 @@
 }
 
 :root {
-  --primary-color: #ff6600;
-  --primary-hover: #e65c00;
+  --primary-color: #8b5cf6;
+  --primary-hover: #7c3aed;
   --secondary-color: #64748b;
   --success-color: #10b981;
   --danger-color: #ef4444;
   --warning-color: #f59e0b;
   --background-color: #f7f7f7;
-  --surface-color: #fff8f3;
+  --surface-color: #faf8ff;
   --text-primary: #1e293b;
   --text-secondary: #888;
   --border-color: #e2e8f0;
@@ -100,7 +100,7 @@ body {
 .tab-navigation {
   display: flex;
   background: var(--surface-color);
-  border-bottom: 1px solid #f0e0d6;
+  border-bottom: 1px solid #e9e5ff;
 }
 
 .tab-btn {
@@ -117,7 +117,7 @@ body {
 }
 
 .tab-btn.active {
-  background: #fff3e6;
+  background: #f3f0ff;
   color: var(--primary-hover);
   border-bottom: 2.5px solid var(--primary-color);
 }
@@ -267,7 +267,7 @@ body {
 .cart-item {
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid #ffe0cc;
+  border-bottom: 1px solid #e9d5ff;
   padding: 0.7rem 0 0.7rem 0;
 }
 
@@ -380,7 +380,7 @@ body {
 .form-group input[type="date"] {
   width: 100%;
   padding: 0.7rem 0.9rem;
-  border: 1.5px solid #ffd6b3;
+  border: 1.5px solid #e9d5ff;
   border-radius: 8px;
   background: #fff;
   color: var(--text-color);
@@ -417,7 +417,7 @@ body {
 }
 
 .btn-secondary {
-  background: #fff3e6;
+  background: #f3f0ff;
   color: var(--primary-color);
   border: 1.5px solid var(--primary-color);
   border-radius: 8px;
@@ -561,4 +561,17 @@ body {
     transform: translateX(-50%) translateY(0);
     opacity: 1;
   }
+}
+
+/* Leyenda de pago */
+.payment-notice {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: var(--surface-color);
+  border-radius: 8px;
+  border-left: 3px solid var(--primary-color);
+  line-height: 1.4;
 } 
