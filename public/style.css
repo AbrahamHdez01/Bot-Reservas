@@ -575,3 +575,15 @@ body {
   border-left: 3px solid var(--primary-color);
   line-height: 1.4;
 } 
+
+/* Scroll horizontal para tablas de admin en móvil */
+.admin-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-table-scroll table {
+  min-width: 700px;
+  width: 100%;
+  border-collapse: collapse;
+} 

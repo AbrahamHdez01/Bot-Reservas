@@ -1,14 +1,15 @@
 # Bot Citas Metro CDMX
 
-Este proyecto es un sistema de reservas para entregas de productos en estaciones del Metro de la Ciudad de México. Permite a los usuarios seleccionar productos (perfumes, body mist, bolsas, complementos y libros personalizados), elegir estación, fecha y hora para la entrega, y gestionar el proceso de reservas de manera eficiente y visual.
+Este proyecto es un sistema de reservas en **tiempo real** para entregas de productos en estaciones del Metro de la Ciudad de México. Utiliza la API de Google Maps para cálculos de rutas y la API de Google Calendar para reflejar automáticamente cada reserva en tu calendario, asegurando máxima organización y eficiencia.
 
 ## 🚀 Características principales
 
-- **Selección de productos por categoría** (perfumes, body mist, bolsas, complementos, libros personalizados)
+- **Reservas en tiempo real:** disponibilidad y horarios siempre actualizados, sin dobles reservas
+- **Integración con Google Calendar:** cada cita se agenda automáticamente en tu Google Calendar, ¡no se te pasa ninguna!
+- **Cálculo inteligente de rutas:** usa la API de Google Maps y lógica propia para estimar tiempos de traslado entre estaciones, para asegurarnos de esto se integraron las coordenadas exactas de cada estación del metro para tener una mayor precision de traslados
+- **Selección de productos por categoría** (perfumes, libros, bolsas, etc)
 - **Carrito de compras**: agrega, elimina y ajusta cantidades antes de reservar
-- **Reserva de horario y estación**: elige estación de metro, fecha y hora disponible
 - **Validación inteligente**: evita reservas en horarios ocupados y valida entradas en tiempo real
-- **Sistema de cálculo de tiempos realista**: calcula tiempos de traslado entre estaciones usando geolocalización y lógica propia (sin depender de Google Maps)
 - **Panel de administración**: para gestionar y visualizar reservas
 - **Interfaz moderna y responsiva**
 
@@ -25,9 +26,16 @@ Este proyecto es un sistema de reservas para entregas de productos en estaciones
 
 1. El usuario entra a la web y selecciona productos por categoría.
 2. Puede agregar productos al carrito, incluyendo libros personalizados (con validación de título en tiempo real).
-3. Elige estación, fecha y hora para la entrega (solo horarios disponibles).
-4. Confirma la reserva, la cual queda registrada y visible en el panel de administración.
-5. El sistema calcula automáticamente los tiempos de traslado y evita solapamientos.
+3. Elige estación, fecha y hora para la entrega (solo horarios disponibles y sin solapamientos).
+4. Confirma la reserva, la cual queda registrada y **se refleja automáticamente en Google Calendar**.
+5. El sistema calcula automáticamente los tiempos de traslado usando la API de Google Maps y lógica propia, evitando solapamientos y optimizando la agenda.
+
+## 🌟 ¿Por qué elegir este sistema?
+
+- **Automatización total:** Olvídate de agendar manualmente, todo queda en tu Google Calendar.
+- **Evita errores humanos:** El sistema bloquea horarios ocupados y calcula rutas realistas.
+- **Escalable y personalizable:** Puedes agregar más productos, categorías o estaciones fácilmente.
+- **Ideal para negocios móviles, ventas en el metro, o cualquier servicio con entregas programadas.**
 
 ## 👨‍💻 Personalización y contacto
 
@@ -42,3 +50,4 @@ Puedo ayudarte a modificar el sistema según tus necesidades, agregar nuevas fun
 ---
 
 ¡Gracias por usar este sistema de reservas Metro CDMX! Si tienes dudas, sugerencias o quieres una versión personalizada, no dudes en escribir. 
+
